@@ -30,8 +30,27 @@ systemd 服务，并在安装完成后输出 `nowhere://` 导入链接和
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh -o nowhere-vps.sh
 chmod +x nowhere-vps.sh
-sudo bash nowhere-vps.sh install
+sudo bash nowhere-vps.sh
 ```
+
+直接运行脚本会进入数字菜单：
+
+```text
+1) 安装/重装（向导，一路回车使用默认值）
+2) 快速默认安装（不提问）
+3) 修改配置（向导）
+4) 更新 Nowhere 二进制
+5) 启动服务
+6) 停止服务
+7) 重启服务
+8) 查看状态
+9) 查看日志
+10) 打印 Anywhere 导入链接
+11) 卸载服务
+0) 退出
+```
+
+第一次使用建议选择 `1`，然后一路回车即可使用默认值完成安装。
 
 也可以一行执行：
 
@@ -62,6 +81,21 @@ sudo bash nowhere-vps.sh install --yes
 ```
 
 注意：`tls=1` 会在 Nowhere 启动时生成临时自签证书，重启后证书会变化。长期使用请改用 `tls=2`。
+
+## 安装向导
+
+选择菜单 `1` 或执行 `sudo bash nowhere-vps.sh install` 会进入交互向导。每一步都会显示默认值：
+
+```text
+公网域名/IP，用于 Anywhere 导入链接 [1.2.3.4]:
+监听地址，留空表示 IPv4/IPv6 全部监听:
+监听端口 [2077]:
+Shared Key [随机值]:
+Spec Seed [随机值]:
+监听模式 mix/tcp/udp [mix]:
+```
+
+如果不想自定义，全部按回车即可。最后脚本会显示配置摘要，再次回车确认应用。
 
 ## 使用 SOCKS5 上游
 

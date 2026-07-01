@@ -108,14 +108,18 @@ die() { printf '\033[1;31m[Error]\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-Nowhere VPS one-click installer for Anywhere.
+Nowhere VPS 一键部署脚本。
 
 Usage:
+  sudo bash nowhere-vps.sh
   sudo bash nowhere-vps.sh install [--yes] [options]
   sudo bash nowhere-vps.sh configure [options]
   sudo bash nowhere-vps.sh update
   sudo bash nowhere-vps.sh start|stop|restart|status|logs|link
   sudo bash nowhere-vps.sh uninstall
+
+No arguments opens the interactive menu. Press Enter in the installer wizard to
+keep every default value.
 
 Options:
   --port 2077              Portal listen port
@@ -141,12 +145,12 @@ EOF
 }
 
 require_root() {
-  [[ "$(id -u)" -eq 0 ]] || die "Please run as root, for example: sudo bash $0 ${ACTION}"
+  [[ "$(id -u)" -eq 0 ]] || die "请使用 root 运行，例如：sudo bash $0 ${ACTION}"
 }
 
 require_systemd() {
-  command -v systemctl >/dev/null 2>&1 || die "systemctl is required on this VPS."
-  [[ -d /run/systemd/system ]] || warn "systemd does not look active; service commands may fail."
+  command -v systemctl >/dev/null 2>&1 || die "当前系统缺少 systemctl，暂不支持此 VPS。"
+  [[ -d /run/systemd/system ]] || warn "systemd 看起来未运行，服务管理命令可能失败。"
 }
 
 env_quote() {
@@ -191,6 +195,58 @@ display_socks() {
   else
     printf '%s' "$socks"
   fi
+}
+
+display_empty() {
+  local value="${1:-}"
+  local fallback="${2:-<空>}"
+  if [[ -z "$value" ]]; then
+    printf '%s' "$fallback"
+  else
+    printf '%s' "$value"
+  fi
+}
+
+mask_secret() {
+  local value="${1:-}"
+  local length="${#value}"
+  if [[ "$length" -le 8 ]]; then
+    printf '***'
+  else
+    printf '%s...%s' "${value:0:4}" "${value: -4}"
+  fi
+}
+
+confirm_default_yes() {
+  local prompt="$1"
+  local answer
+  if [[ "$ASSUME_YES" -eq 1 ]]; then
+    return 0
+  fi
+  read -r -p "${prompt} [Y/n]: " answer
+  [[ -z "$answer" || "$answer" == "y" || "$answer" == "Y" || "$answer" == "yes" || "$answer" == "YES" ]]
+}
+
+print_config_summary() {
+  echo
+  echo "配置确认："
+  echo "  公网域名/IP:       $(display_empty "${NOWHERE_PUBLIC_HOST:-}" "<自动探测失败，稍后可重新配置>")"
+  echo "  监听地址:          $(display_empty "${NOWHERE_LISTEN_HOST:-}" "<空，IPv4/IPv6 wildcard>")"
+  echo "  监听端口:          ${NOWHERE_PORT:-}"
+  echo "  Shared Key:        $(mask_secret "${NOWHERE_KEY:-}")"
+  echo "  Spec:              $(mask_secret "${NOWHERE_SPEC:-}")"
+  echo "  Net:               ${NOWHERE_NET:-}"
+  echo "  TLS:               ${NOWHERE_TLS:-}"
+  if [[ "${NOWHERE_TLS:-}" == "2" ]]; then
+    echo "  证书链:            ${NOWHERE_CRT:-}"
+    echo "  私钥:              ${NOWHERE_TLS_KEY:-}"
+  fi
+  echo "  ALPN:              ${NOWHERE_ALPN:-}"
+  echo "  Rate / Etar:       ${NOWHERE_RATE:-0} / ${NOWHERE_ETAR:-0} Mbps"
+  echo "  Dial:              ${NOWHERE_DIAL:-auto}"
+  echo "  SOCKS5 出站:       $(display_socks "${NOWHERE_SOCKS:-none}")"
+  echo "  Log:               ${NOWHERE_LOG:-}"
+  echo "  TCP Pool:          ${NOWHERE_POOL:-}"
 }
 
 random_token() {
@@ -363,29 +419,33 @@ configure_values() {
   NOWHERE_TLS="${NOWHERE_TLS:-${NOWHERE_TLS_VALUE:-$default_tls}}"
 
   if [[ "$ASSUME_YES" -eq 0 ]]; then
-    info "Configure Nowhere Portal. Press Enter to keep the value in brackets."
-    NOWHERE_PUBLIC_HOST="$(read_value "Public domain/IP for Anywhere links" "$NOWHERE_PUBLIC_HOST")"
-    NOWHERE_LISTEN_HOST="$(read_value "Listen host, empty = IPv4/IPv6 wildcard" "$NOWHERE_LISTEN_HOST")"
-    NOWHERE_PORT="$(read_value "Listen port" "$NOWHERE_PORT")"
-    NOWHERE_KEY="$(read_value "Shared key" "$NOWHERE_KEY")"
-    NOWHERE_SPEC="$(read_value "Spec seed" "$NOWHERE_SPEC")"
-    NOWHERE_NET="$(read_value "Server net (mix/tcp/udp)" "$NOWHERE_NET")"
+    info "进入安装向导：一路回车即可使用括号中的默认值。"
+    NOWHERE_PUBLIC_HOST="$(read_value "公网域名/IP，用于 Anywhere 导入链接" "$NOWHERE_PUBLIC_HOST")"
+    NOWHERE_LISTEN_HOST="$(read_value "监听地址，留空表示 IPv4/IPv6 全部监听" "$NOWHERE_LISTEN_HOST")"
+    NOWHERE_PORT="$(read_value "监听端口" "$NOWHERE_PORT")"
+    NOWHERE_KEY="$(read_value "Shared Key" "$NOWHERE_KEY")"
+    NOWHERE_SPEC="$(read_value "Spec Seed" "$NOWHERE_SPEC")"
+    NOWHERE_NET="$(read_value "监听模式 mix/tcp/udp" "$NOWHERE_NET")"
     NOWHERE_ALPN="$(read_value "ALPN" "$NOWHERE_ALPN")"
-    NOWHERE_TLS="$(read_value "TLS mode (1=self-signed, 2=PEM certificate)" "$NOWHERE_TLS")"
+    NOWHERE_TLS="$(read_value "TLS 模式：1=临时自签，2=PEM 证书" "$NOWHERE_TLS")"
     if [[ "$NOWHERE_TLS" == "2" ]]; then
-      NOWHERE_CRT="$(read_value "Certificate chain path" "$NOWHERE_CRT")"
-      NOWHERE_TLS_KEY="$(read_value "Private key path" "$NOWHERE_TLS_KEY")"
+      NOWHERE_CRT="$(read_value "证书链路径 fullchain.pem/cert.pem" "$NOWHERE_CRT")"
+      NOWHERE_TLS_KEY="$(read_value "私钥路径 privkey.pem/key.pem" "$NOWHERE_TLS_KEY")"
     fi
-    NOWHERE_RATE="$(read_value "Client-to-target limit Mbps, 0 disables" "$NOWHERE_RATE")"
-    NOWHERE_ETAR="$(read_value "Target-to-client limit Mbps, 0 disables" "$NOWHERE_ETAR")"
-    NOWHERE_DIAL="$(read_value "Outbound source IP or auto" "$NOWHERE_DIAL")"
-    NOWHERE_SOCKS="$(read_value "SOCKS5 outbound proxy, none/host:port/user:pass@host:port" "$NOWHERE_SOCKS")"
-    NOWHERE_LOG="$(read_value "Log level" "$NOWHERE_LOG")"
-    NOWHERE_POOL="$(read_value "Anywhere TCP pool for net=tcp links (0..9)" "$NOWHERE_POOL")"
+    NOWHERE_RATE="$(read_value "上行限速 Mbps，0 表示不限速" "$NOWHERE_RATE")"
+    NOWHERE_ETAR="$(read_value "下行限速 Mbps，0 表示不限速" "$NOWHERE_ETAR")"
+    NOWHERE_DIAL="$(read_value "出站源 IP，auto 表示系统默认" "$NOWHERE_DIAL")"
+    NOWHERE_SOCKS="$(read_value "SOCKS5 出站代理，none/host:port/user:pass@host:port" "$NOWHERE_SOCKS")"
+    NOWHERE_LOG="$(read_value "日志级别 none/debug/info/warn/error/event" "$NOWHERE_LOG")"
+    NOWHERE_POOL="$(read_value "Anywhere TCP pool，0..9" "$NOWHERE_POOL")"
   fi
 
   validate_config_values
   NOWHERE_PORTAL="$(build_portal_url)"
+  if [[ "$ASSUME_YES" -eq 0 ]]; then
+    print_config_summary
+    confirm_default_yes "确认保存并应用以上配置吗？" || die "已取消配置。"
+  fi
 }
 
 save_config() {
@@ -580,6 +640,10 @@ install_all() {
   print_links
 }
 
+quick_install_all() {
+  ASSUME_YES=1 install_all
+}
+
 configure_all() {
   require_root
   require_systemd
@@ -616,34 +680,41 @@ uninstall_all() {
 
 menu() {
   require_root
+  require_systemd
   while true; do
     cat <<EOF
 
-Nowhere VPS Manager
-  1) Install or reinstall
-  2) Configure
-  3) Update binary
-  4) Start service
-  5) Stop service
-  6) Restart service
-  7) Status
-  8) Logs
-  9) Print Anywhere links
-  0) Exit
+==============================
+ Nowhere VPS 管理脚本
+==============================
+  1) 安装/重装（向导，一路回车使用默认值）
+  2) 快速默认安装（不提问）
+  3) 修改配置（向导）
+  4) 更新 Nowhere 二进制
+  5) 启动服务
+  6) 停止服务
+  7) 重启服务
+  8) 查看状态
+  9) 查看日志
+ 10) 打印 Anywhere 导入链接
+ 11) 卸载服务
+  0) 退出
 EOF
-    read -r -p "Choose: " choice
+    read -r -p "请输入数字: " choice
     case "$choice" in
       1) install_all ;;
-      2) configure_all ;;
-      3) update_all ;;
-      4) service_cmd start ;;
-      5) service_cmd stop ;;
-      6) service_cmd restart ;;
-      7) service_cmd status ;;
-      8) journalctl -u "$SERVICE_NAME" -f ;;
-      9) print_links ;;
+      2) quick_install_all ;;
+      3) configure_all ;;
+      4) update_all ;;
+      5) service_cmd start ;;
+      6) service_cmd stop ;;
+      7) service_cmd restart ;;
+      8) service_cmd status ;;
+      9) journalctl -u "$SERVICE_NAME" -f ;;
+      10) print_links ;;
+      11) uninstall_all ;;
       0) exit 0 ;;
-      *) warn "Unknown choice: ${choice}" ;;
+      *) warn "未知选项：${choice}" ;;
     esac
   done
 }
