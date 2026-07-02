@@ -607,7 +607,7 @@ install_binary() {
   asset="$(detect_asset)"
   url="https://github.com/${REPO}/releases/latest/download/${asset}"
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' RETURN
+  trap 'rm -rf "${tmpdir:-}"' RETURN
 
   info "Downloading ${asset} from latest ${REPO} release..."
   curl -fL --retry 3 --connect-timeout 10 -o "${tmpdir}/${asset}" "$url"
@@ -618,6 +618,8 @@ install_binary() {
   fi
   [[ -n "$binary" ]] || die "Could not find nowhere binary in release archive."
   install -m 755 "$binary" "$BIN_PATH"
+  rm -rf "$tmpdir"
+  trap - RETURN
   info "Installed ${BIN_PATH}"
 }
 
