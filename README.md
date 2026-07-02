@@ -1,31 +1,34 @@
 # nowhere-sh
 
-Nowhere Portal 的 Linux VPS 一键部署脚本，适合搭配 Anywhere 客户端使用。
+[简体中文](README.zh-CN.md)
 
-脚本会自动下载 `NodePassProject/Nowhere` 最新 Linux release，安装二进制，生成
-systemd 服务，并在安装完成后输出 `nowhere://` 导入链接和
-`anywhere://add-proxy?link=...` 深链。
+A one-click Linux VPS deployment script for Nowhere Portal, designed for use
+with the Anywhere client.
 
-## 功能
+The script downloads the latest Linux release from `NodePassProject/Nowhere`,
+installs the binary, creates a systemd service, and prints both a `nowhere://`
+import URI and an `anywhere://add-proxy?link=...` deep link.
 
-- 自动识别 `x86_64` / `aarch64` 和 `gnu` / `musl` Linux 包。
-- 安装 Nowhere 到 `/usr/local/bin/nowhere`。
-- 配置文件保存到 `/etc/nowhere/nowhere.env`，权限为 `0600`。
-- 创建并管理 systemd 服务 `/etc/systemd/system/nowhere.service`。
-- 支持 `mix` / `tcp` / `udp` 监听模式。
-- 支持 `tls=1` 自签临时证书和 `tls=2` PEM 证书。
-- 支持速率限制、出站源地址、日志级别、Anywhere TCP pool。
-- 支持 Nowhere `v1.2.4+` 的 `socks` 出站 SOCKS5 上游代理。
+## Features
 
-## 系统要求
+- Detects `x86_64` / `aarch64` and `gnu` / `musl` Linux packages automatically.
+- Installs Nowhere to `/usr/local/bin/nowhere`.
+- Stores configuration in `/etc/nowhere/nowhere.env` with `0600` permissions.
+- Creates and manages `/etc/systemd/system/nowhere.service`.
+- Supports `mix`, `tcp`, and `udp` listener modes.
+- Supports `tls=1` ephemeral self-signed certificates and `tls=2` PEM certificates.
+- Supports rate limits, outbound source address, log level, and Anywhere TCP pool.
+- Supports Nowhere `v1.2.4+` SOCKS5 outbound upstream via `socks`.
 
-- Linux VPS，使用 systemd。
-- `curl`、`tar`。
-- 推荐使用 Debian、Ubuntu、Rocky Linux、AlmaLinux、CentOS Stream 等常见发行版。
+## Requirements
 
-## 快速安装
+- A Linux VPS with systemd.
+- `curl` and `tar`.
+- Debian, Ubuntu, Rocky Linux, AlmaLinux, CentOS Stream, and similar distributions are recommended.
 
-推荐先下载脚本再执行：
+## Quick Start
+
+Download the script first:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh -o nowhere-vps.sh
@@ -33,37 +36,37 @@ chmod +x nowhere-vps.sh
 sudo bash nowhere-vps.sh
 ```
 
-直接运行脚本会进入数字菜单：
+Running the script without arguments opens the interactive menu:
 
 ```text
-1) 安装/重装（向导，一路回车使用默认值）
-2) 快速默认安装（不提问）
-3) 修改配置（向导）
-4) 更新 Nowhere 二进制
-5) 启动服务
-6) 停止服务
-7) 重启服务
-8) 查看状态
-9) 查看日志
-10) 打印 Anywhere 导入链接
-11) 查看 tls=1 自签证书 SHA-256
-12) 卸载服务
-0) 退出
+1) Install/Reinstall (wizard; press Enter to use defaults)
+2) Quick default install (no prompts)
+3) Reconfigure (wizard)
+4) Update Nowhere binary
+5) Start service
+6) Stop service
+7) Restart service
+8) Show status
+9) Show logs
+10) Print Anywhere import links
+11) Show tls=1 self-signed certificate SHA-256
+12) Uninstall service
+0) Exit
 ```
 
-第一次使用建议选择 `1`，然后一路回车即可使用默认值完成安装。
+For first-time use, choose `1` and press Enter through the wizard to accept the defaults.
 
-也可以一行执行：
+One-line install is also supported:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh | sudo bash -s -- install
 ```
 
-安装过程会询问端口、密钥、域名/IP、证书路径等参数。完成后，终端会打印 Anywhere 可导入的链接。
+The installer asks for port, shared key, domain/IP, certificate paths, and other options. At the end it prints import links for Anywhere.
 
-## 推荐部署方式
+## Recommended Deployment
 
-日常使用建议准备一个域名，并使用真实 TLS 证书：
+For daily use, use a domain name and a valid TLS certificate:
 
 ```bash
 sudo NOWHERE_PUBLIC_HOST=proxy.example.com \
@@ -75,53 +78,64 @@ sudo NOWHERE_PUBLIC_HOST=proxy.example.com \
   bash nowhere-vps.sh install --yes
 ```
 
-如果只是临时测试，可以使用默认的 `tls=1`：
+For quick testing, you can use the default `tls=1` mode:
 
 ```bash
 sudo bash nowhere-vps.sh install --yes
 ```
 
-注意：`tls=1` 会在 Nowhere 启动时生成临时自签证书，重启后证书会变化。长期使用请改用 `tls=2`。
+Note: `tls=1` creates an ephemeral self-signed certificate when Nowhere starts.
+The certificate changes after every restart. Use `tls=2` for long-lived deployments.
 
-## 自签证书 SHA-256
+## Self-Signed Certificate SHA-256
 
-默认 `tls=1` 会生成内存自签证书。脚本在安装、重启、更新后会自动尝试输出当前证书的 SHA-256 fingerprint：
+The default `tls=1` mode creates an in-memory self-signed certificate. The script
+automatically tries to print the current certificate SHA-256 fingerprint after
+install, restart, or update:
 
 ```text
-当前 tls=1 自签证书 SHA-256 fingerprint：
+Current tls=1 self-signed certificate SHA-256 fingerprint:
   AA:BB:CC:...
 ```
 
-也可以随时手动查看：
+You can also print it manually:
 
 ```bash
 sudo bash nowhere-vps.sh fingerprint
 ```
 
-或者进入菜单选择 `11`。
+Or choose menu item `11`.
 
-脚本会优先读取 Nowhere `v1.2.5+` 日志中的 `CERT_SHA256|...` 字段；如果没有读到，再回退到本机 TLS 探测或旧日志匹配。
+The script first reads the `CERT_SHA256|...` log field introduced in Nowhere
+`v1.2.5+`. If that is not available, it falls back to local TLS probing or older
+log matching.
 
-因为 `tls=1` 的证书存在内存中，Nowhere 每次重启后 fingerprint 都会变化。生产环境仍建议使用 `tls=2` 配置稳定证书。
+Because `tls=1` certificates live in memory, the fingerprint changes after every
+Nowhere restart. Production deployments should use `tls=2` with a stable
+certificate.
 
-## 安装向导
+## Installer Wizard
 
-选择菜单 `1` 或执行 `sudo bash nowhere-vps.sh install` 会进入交互向导。每一步都会显示默认值：
+Choosing menu item `1` or running `sudo bash nowhere-vps.sh install` starts the
+interactive wizard. Every prompt has a default value:
 
 ```text
-公网域名/IP，用于 Anywhere 导入链接 [1.2.3.4]:
-监听地址，留空表示 IPv4/IPv6 全部监听:
-监听端口 [2077]:
-Shared Key [随机值]:
-Spec Seed [随机值]:
-监听模式 mix/tcp/udp [mix]:
+Public domain/IP for Anywhere import links [1.2.3.4]:
+Listen address, empty means IPv4/IPv6 wildcard:
+Listen port [2077]:
+Shared Key [random value]:
+Spec Seed [random value]:
+Listener mode mix/tcp/udp [mix]:
 ```
 
-如果不想自定义，全部按回车即可。最后脚本会显示配置摘要，再次回车确认应用。
+If you do not want to customize anything, press Enter through all prompts. The
+script shows a configuration summary before applying it; press Enter again to
+confirm.
 
-## 使用 SOCKS5 上游
+## SOCKS5 Upstream
 
-如果希望 Nowhere Portal 的所有出站目标流量再经过一个 SOCKS5 代理，可以配置：
+If you want all outbound target traffic from Nowhere Portal to go through a
+SOCKS5 proxy, configure `NOWHERE_SOCKS`:
 
 ```bash
 sudo NOWHERE_PUBLIC_HOST=proxy.example.com \
@@ -134,7 +148,7 @@ sudo NOWHERE_PUBLIC_HOST=proxy.example.com \
   bash nowhere-vps.sh install --yes
 ```
 
-`NOWHERE_SOCKS` 支持：
+Supported `NOWHERE_SOCKS` formats:
 
 ```text
 none
@@ -144,9 +158,11 @@ user:pass@host:port
 user:pass@[2001:db8::10]:1080
 ```
 
-`NOWHERE_SOCKS` 是服务端出站设置，只写入 Portal URL，不会写入 Anywhere 客户端导入链接。Anywhere 仍然只连接你的 Nowhere Portal。
+`NOWHERE_SOCKS` is a server-side outbound setting. It is written into the Portal
+URL, but it is not added to the `nowhere://` link imported by Anywhere. From the
+client perspective, Anywhere still connects only to your Nowhere Portal.
 
-## 管理命令
+## Management Commands
 
 ```bash
 sudo bash nowhere-vps.sh configure
@@ -161,48 +177,49 @@ sudo bash nowhere-vps.sh fingerprint
 sudo bash nowhere-vps.sh uninstall
 ```
 
-常用命令说明：
+Command notes:
 
-- `configure`：重新配置参数并重启服务。
-- `update`：下载最新 Nowhere release 并重启服务。
-- `logs`：实时查看 systemd 日志。
-- `link`：重新打印 Anywhere 导入链接。
-- `fingerprint`：查看当前 `tls=1` 自签证书的 SHA-256 fingerprint。
-- `uninstall`：删除二进制和 systemd 服务，但保留 `/etc/nowhere` 配置目录，避免误删密钥。
+- `configure`: edit configuration and restart the service if enabled.
+- `update`: download the latest Nowhere release and restart the service.
+- `logs`: follow systemd logs.
+- `link`: print Anywhere import links again.
+- `fingerprint`: print the current `tls=1` self-signed certificate SHA-256 fingerprint.
+- `uninstall`: remove the binary and systemd service, but keep `/etc/nowhere` so keys are not deleted accidentally.
 
-## 参数说明
+## Parameters
 
-所有参数既可以在交互模式中填写，也可以用环境变量或命令行参数传入。
+All options can be entered in the wizard, set as environment variables, or passed
+as command-line flags.
 
-| 环境变量 | 命令行参数 | 默认值 | 说明 |
+| Environment variable | CLI flag | Default | Description |
 | --- | --- | --- | --- |
-| `NOWHERE_PUBLIC_HOST` | `--public-host` | 自动探测 | Anywhere 导入链接中的域名或公网 IP |
-| `NOWHERE_LISTEN_HOST` | `--listen-host` | 空 | 监听地址；空表示 IPv4/IPv6 wildcard |
-| `NOWHERE_PORT` | `--port` | `2077` | Portal 监听端口 |
-| `NOWHERE_KEY` | `--key` | 随机生成 | Nowhere shared key |
-| `NOWHERE_SPEC` | `--spec` | 随机生成 | Nowhere spec seed |
-| `NOWHERE_NET` | `--net` | `mix` | `mix`、`tcp`、`udp` |
-| `NOWHERE_TLS` | `--tls` | `1` | `1` 自签临时证书，`2` PEM 证书 |
-| `NOWHERE_CRT` | `--crt` | 空 | `tls=2` 的证书链路径 |
-| `NOWHERE_TLS_KEY` | `--tls-key` | 空 | `tls=2` 的私钥路径 |
+| `NOWHERE_PUBLIC_HOST` | `--public-host` | auto-detected | Domain or public IP used in Anywhere import links |
+| `NOWHERE_LISTEN_HOST` | `--listen-host` | empty | Listen address; empty means IPv4/IPv6 wildcard |
+| `NOWHERE_PORT` | `--port` | `2077` | Portal listen port |
+| `NOWHERE_KEY` | `--key` | random | Nowhere shared key |
+| `NOWHERE_SPEC` | `--spec` | random | Nowhere spec seed |
+| `NOWHERE_NET` | `--net` | `mix` | `mix`, `tcp`, or `udp` |
+| `NOWHERE_TLS` | `--tls` | `1` | `1` ephemeral self-signed cert, `2` PEM cert |
+| `NOWHERE_CRT` | `--crt` | empty | Certificate chain path for `tls=2` |
+| `NOWHERE_TLS_KEY` | `--tls-key` | empty | Private key path for `tls=2` |
 | `NOWHERE_ALPN` | `--alpn` | `now/1` | TLS/QUIC ALPN |
-| `NOWHERE_RATE` | `--rate` | `0` | 客户端到目标方向 Mbps 限速，`0` 关闭 |
-| `NOWHERE_ETAR` | `--etar` | `0` | 目标到客户端方向 Mbps 限速，`0` 关闭 |
-| `NOWHERE_DIAL` | `--dial` | `auto` | 出站源 IP 或 `auto` |
-| `NOWHERE_SOCKS` | `--socks` | `none` | SOCKS5 出站上游 |
-| `NOWHERE_LOG` | `--log` | `info` | `none`、`debug`、`info`、`warn`、`error`、`event` |
-| `NOWHERE_POOL` | `--pool` | `5` | Anywhere `net=tcp` 导入链接的 TCP pool 大小 |
+| `NOWHERE_RATE` | `--rate` | `0` | Client-to-target Mbps limit; `0` disables it |
+| `NOWHERE_ETAR` | `--etar` | `0` | Target-to-client Mbps limit; `0` disables it |
+| `NOWHERE_DIAL` | `--dial` | `auto` | Outbound source IP or `auto` |
+| `NOWHERE_SOCKS` | `--socks` | `none` | SOCKS5 outbound upstream |
+| `NOWHERE_LOG` | `--log` | `info` | `none`, `debug`, `info`, `warn`, `error`, or `event` |
+| `NOWHERE_POOL` | `--pool` | `5` | TCP pool size used in Anywhere `net=tcp` import links |
 
-## 防火墙
+## Firewall
 
-如果使用默认 `NOWHERE_NET=mix`，需要同时放行 TCP 和 UDP：
+If `NOWHERE_NET=mix`, open both TCP and UDP on the selected port:
 
 ```bash
 sudo ufw allow 443/tcp
 sudo ufw allow 443/udp
 ```
 
-firewalld 示例：
+firewalld example:
 
 ```bash
 sudo firewall-cmd --permanent --add-port=443/tcp
@@ -210,24 +227,26 @@ sudo firewall-cmd --permanent --add-port=443/udp
 sudo firewall-cmd --reload
 ```
 
-如果 `NOWHERE_NET=tcp`，只需要开放 TCP。如果 `NOWHERE_NET=udp`，只需要开放 UDP。
+If `NOWHERE_NET=tcp`, open TCP only. If `NOWHERE_NET=udp`, open UDP only.
 
-## Anywhere 导入
+## Import Into Anywhere
 
-安装完成后脚本会打印：
+After installation, the script prints:
 
 - `nowhere://...`
 - `anywhere://add-proxy?link=...`
 
-在 iPhone、iPad 或 Apple TV 上，可以复制 `nowhere://` 链接到 Anywhere 中导入；如果系统能识别 Anywhere deep link，也可以直接打开 `anywhere://add-proxy?link=...`。
+On iPhone, iPad, or Apple TV, copy the `nowhere://` link into Anywhere. If your
+system recognizes Anywhere deep links, you can open the
+`anywhere://add-proxy?link=...` link directly.
 
-如果忘记保存链接，在 VPS 上运行：
+If you forgot to save the link, run this on the VPS:
 
 ```bash
 sudo bash nowhere-vps.sh link
 ```
 
-## 配置文件位置
+## File Locations
 
 ```text
 /usr/local/bin/nowhere
@@ -235,46 +254,46 @@ sudo bash nowhere-vps.sh link
 /etc/systemd/system/nowhere.service
 ```
 
-查看当前服务：
+Check service status:
 
 ```bash
 systemctl status nowhere
 ```
 
-查看配置：
+Show configuration:
 
 ```bash
 sudo cat /etc/nowhere/nowhere.env
 ```
 
-## 故障排查
+## Troubleshooting
 
-查看日志：
+Follow logs:
 
 ```bash
 sudo bash nowhere-vps.sh logs
 ```
 
-检查端口监听：
+Check listening ports:
 
 ```bash
 ss -lntup | grep nowhere
 ```
 
-重启服务：
+Restart the service:
 
 ```bash
 sudo bash nowhere-vps.sh restart
 ```
 
-常见问题：
+Common issues:
 
-- 连不上：检查 VPS 安全组、防火墙、`NOWHERE_NET` 对应的 TCP/UDP 端口是否放行。
-- 证书错误：生产环境建议使用 `tls=2`，并确认 `NOWHERE_PUBLIC_HOST` 与证书域名一致。
-- QUIC 不通：很多云厂商安全组默认只放 TCP，记得额外放行 UDP。
-- SOCKS5 不通：确认 `NOWHERE_SOCKS` 指向的代理在 VPS 上可达，认证信息正确。
+- Cannot connect: check VPS security group, firewall, and TCP/UDP port rules for `NOWHERE_NET`.
+- Certificate errors: use `tls=2` in production and make sure `NOWHERE_PUBLIC_HOST` matches the certificate name.
+- QUIC does not work: many cloud firewalls allow TCP only by default; open UDP separately.
+- SOCKS5 does not work: make sure the proxy in `NOWHERE_SOCKS` is reachable from the VPS and credentials are correct.
 
-## 上游项目
+## Upstream Projects
 
 - Nowhere: https://github.com/NodePassProject/Nowhere
 - Anywhere: https://github.com/NodePassProject/Anywhere
