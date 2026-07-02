@@ -46,7 +46,8 @@ sudo bash nowhere-vps.sh
 8) 查看状态
 9) 查看日志
 10) 打印 Anywhere 导入链接
-11) 卸载服务
+11) 查看 tls=1 自签证书 SHA-256
+12) 卸载服务
 0) 退出
 ```
 
@@ -81,6 +82,25 @@ sudo bash nowhere-vps.sh install --yes
 ```
 
 注意：`tls=1` 会在 Nowhere 启动时生成临时自签证书，重启后证书会变化。长期使用请改用 `tls=2`。
+
+## 自签证书 SHA-256
+
+默认 `tls=1` 会生成内存自签证书。脚本在安装、重启、更新后会自动尝试输出当前证书的 SHA-256 fingerprint：
+
+```text
+当前 tls=1 自签证书 SHA-256 fingerprint：
+  AA:BB:CC:...
+```
+
+也可以随时手动查看：
+
+```bash
+sudo bash nowhere-vps.sh fingerprint
+```
+
+或者进入菜单选择 `11`。
+
+因为 `tls=1` 的证书存在内存中，Nowhere 每次重启后 fingerprint 都会变化。生产环境仍建议使用 `tls=2` 配置稳定证书。
 
 ## 安装向导
 
@@ -135,6 +155,7 @@ sudo bash nowhere-vps.sh restart
 sudo bash nowhere-vps.sh status
 sudo bash nowhere-vps.sh logs
 sudo bash nowhere-vps.sh link
+sudo bash nowhere-vps.sh fingerprint
 sudo bash nowhere-vps.sh uninstall
 ```
 
@@ -144,6 +165,7 @@ sudo bash nowhere-vps.sh uninstall
 - `update`：下载最新 Nowhere release 并重启服务。
 - `logs`：实时查看 systemd 日志。
 - `link`：重新打印 Anywhere 导入链接。
+- `fingerprint`：查看当前 `tls=1` 自签证书的 SHA-256 fingerprint。
 - `uninstall`：删除二进制和 systemd 服务，但保留 `/etc/nowhere` 配置目录，避免误删密钥。
 
 ## 参数说明

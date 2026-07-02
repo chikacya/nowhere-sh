@@ -116,6 +116,7 @@ Usage:
   sudo bash nowhere-vps.sh configure [options]
   sudo bash nowhere-vps.sh update
   sudo bash nowhere-vps.sh start|stop|restart|status|logs|link
+  sudo bash nowhere-vps.sh fingerprint
   sudo bash nowhere-vps.sh uninstall
 
 No arguments opens the interactive menu. Press Enter in the installer wizard to
@@ -197,6 +198,13 @@ display_socks() {
   fi
 }
 
+strip_brackets() {
+  local host="${1:-}"
+  host="${host#[}"
+  host="${host%]}"
+  printf '%s' "$host"
+}
+
 display_empty() {
   local value="${1:-}"
   local fallback="${2:-<空>}"
@@ -205,6 +213,92 @@ display_empty() {
   else
     printf '%s' "$value"
   fi
+}
+
+local_tls_probe_host() {
+  local host="${NOWHERE_LISTEN_HOST_VALUE:-}"
+  if [[ -z "$host" || "$host" == "0.0.0.0" || "$host" == "::" || "$host" == "[::]" ]]; then
+    printf '127.0.0.1'
+  else
+    strip_brackets "$host"
+  fi
+}
+
+print_tls_fingerprint_from_tcp() {
+  command -v openssl >/dev/null 2>&1 || return 1
+  command -v timeout >/dev/null 2>&1 || return 1
+  [[ "${NOWHERE_NET_VALUE:-mix}" != "udp" ]] || return 1
+  [[ -n "${NOWHERE_PORT_VALUE:-}" ]] || return 1
+
+  local connect_host sni output fingerprint
+  connect_host="$(local_tls_probe_host)"
+  sni="${NOWHERE_PUBLIC_HOST_VALUE:-localhost}"
+  for _ in 1 2 3 4 5; do
+    output="$(
+      timeout 8 openssl s_client \
+        -connect "${connect_host}:${NOWHERE_PORT_VALUE}" \
+        -servername "$sni" \
+        -showcerts </dev/null 2>/dev/null |
+        openssl x509 -noout -fingerprint -sha256 2>/dev/null || true
+    )"
+    fingerprint="${output#*=}"
+    if [[ -n "$fingerprint" && "$fingerprint" != "$output" ]]; then
+      printf '%s\n' "$fingerprint"
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+print_tls_fingerprint_from_logs() {
+  command -v journalctl >/dev/null 2>&1 || return 1
+  local line fingerprint
+  line="$(
+    journalctl -u "$SERVICE_NAME" -n 300 --no-pager 2>/dev/null |
+      grep -Eai 'fingerprint|sha-?256' |
+      tail -n 1 || true
+  )"
+  [[ -n "$line" ]] || return 1
+  fingerprint="$(
+    printf '%s\n' "$line" |
+      grep -Eaio '([A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2}|[A-Fa-f0-9]{64}' |
+      tail -n 1 || true
+  )"
+  [[ -n "$fingerprint" ]] || {
+    printf '%s\n' "$line"
+    return 0
+  }
+  printf '%s\n' "$fingerprint"
+}
+
+print_tls_fingerprint() {
+  require_root
+  load_config
+  if [[ "${NOWHERE_TLS_VALUE:-1}" != "1" ]]; then
+    echo
+    echo "当前配置不是 tls=1 自签模式，无需使用自签证书 fingerprint。"
+    echo "tls=2 请使用系统证书链校验，或在证书变更后按客户端需要重新固定证书。"
+    return 0
+  fi
+
+  echo
+  echo "当前 tls=1 自签证书 SHA-256 fingerprint："
+  local fingerprint
+  if fingerprint="$(print_tls_fingerprint_from_tcp)"; then
+    echo "  ${fingerprint}"
+    echo
+    echo "提示：tls=1 证书存在内存中，Nowhere 每次重启后 fingerprint 都会变化。"
+    return 0
+  fi
+  if fingerprint="$(print_tls_fingerprint_from_logs)"; then
+    echo "  ${fingerprint}"
+    echo
+    echo "提示：tls=1 证书存在内存中，Nowhere 每次重启后 fingerprint 都会变化。"
+    return 0
+  fi
+
+  warn "暂时没有获取到 fingerprint。请确认服务已启动，并且 net 不是 udp-only；也可以查看：journalctl -u ${SERVICE_NAME} -n 100"
 }
 
 mask_secret() {
@@ -544,6 +638,16 @@ service_cmd() {
   systemctl "$1" "$SERVICE_NAME"
 }
 
+start_service() {
+  service_cmd start
+  print_tls_fingerprint
+}
+
+restart_service() {
+  service_cmd restart
+  print_tls_fingerprint
+}
+
 print_links() {
   require_root
   load_config
@@ -638,6 +742,7 @@ install_all() {
   systemctl enable --now "$SERVICE_NAME"
   info "Nowhere service enabled and started."
   print_links
+  print_tls_fingerprint
 }
 
 quick_install_all() {
@@ -653,6 +758,7 @@ configure_all() {
   if systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then
     systemctl restart "$SERVICE_NAME"
     info "Nowhere service restarted."
+    print_tls_fingerprint
   else
     warn "Service is configured but not enabled. Run: systemctl enable --now ${SERVICE_NAME}"
   fi
@@ -665,6 +771,7 @@ update_all() {
   install_binary
   if systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1; then
     systemctl restart "$SERVICE_NAME"
+    print_tls_fingerprint
   fi
   info "Nowhere binary updated."
 }
@@ -697,7 +804,8 @@ menu() {
   8) 查看状态
   9) 查看日志
  10) 打印 Anywhere 导入链接
- 11) 卸载服务
+ 11) 查看 tls=1 自签证书 SHA-256
+ 12) 卸载服务
   0) 退出
 EOF
     read -r -p "请输入数字: " choice
@@ -706,13 +814,14 @@ EOF
       2) quick_install_all ;;
       3) configure_all ;;
       4) update_all ;;
-      5) service_cmd start ;;
+      5) start_service ;;
       6) service_cmd stop ;;
-      7) service_cmd restart ;;
+      7) restart_service ;;
       8) service_cmd status ;;
       9) journalctl -u "$SERVICE_NAME" -f ;;
       10) print_links ;;
-      11) uninstall_all ;;
+      11) print_tls_fingerprint ;;
+      12) uninstall_all ;;
       0) exit 0 ;;
       *) warn "未知选项：${choice}" ;;
     esac
@@ -723,7 +832,10 @@ case "$ACTION" in
   install) install_all ;;
   configure|config) configure_all ;;
   update) update_all ;;
-  start|stop|restart|status) service_cmd "$ACTION" ;;
+  start) start_service ;;
+  restart) restart_service ;;
+  stop|status) service_cmd "$ACTION" ;;
+  fingerprint|sha256|sha-256) print_tls_fingerprint ;;
   logs|log) require_root; journalctl -u "$SERVICE_NAME" -f ;;
   link|links) print_links ;;
   uninstall|remove) uninstall_all ;;
