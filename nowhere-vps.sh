@@ -14,11 +14,14 @@ DEFAULT_ALPN="now/1"
 DEFAULT_LOG="info"
 DEFAULT_POOL="5"
 DEFAULT_SOCKS="none"
-DEFAULT_PROTOCOL="legacy"
+DEFAULT_PROTOCOL="modern"
+DEFAULT_CLIENT="anywhere"
 DEFAULT_LEGACY_VERSION="v1.4.0"
-DEFAULT_VECTOR_VERSION="v1.5.0"
+DEFAULT_MODERN_VERSION="v1.5.1"
+DEFAULT_VECTOR_VERSION="$DEFAULT_MODERN_VERSION"
 DEFAULT_VECTOR_SOCKS="127.0.0.1:1080"
 DEFAULT_VECTOR_SNI="none"
+DEFAULT_VECTOR_PIN="none"
 
 ASSUME_YES=0
 VERSION_EXPLICIT=0
@@ -47,6 +50,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --protocol)
       NOWHERE_PROTOCOL="${2:?missing --protocol value}"
+      shift 2
+      ;;
+    --client)
+      NOWHERE_CLIENT="${2:?missing --client value}"
       shift 2
       ;;
     --version)
@@ -114,6 +121,10 @@ while [[ $# -gt 0 ]]; do
       NOWHERE_VECTOR_SNI="${2:?missing --sni value}"
       shift 2
       ;;
+    --pin)
+      NOWHERE_VECTOR_PIN="${2:?missing --pin value}"
+      shift 2
+      ;;
     -h|--help)
       ACTION="help"
       shift
@@ -135,9 +146,10 @@ Nowhere VPS 一键部署脚本。
 
 Usage:
   sudo bash nowhere-vps.sh
-  sudo bash nowhere-vps.sh install|install-legacy [--yes] [options]
+  sudo bash nowhere-vps.sh install|install-anywhere|install-legacy [--yes] [options]
   sudo bash nowhere-vps.sh install-vector [--yes] [options]
   sudo bash nowhere-vps.sh configure [options]
+  sudo bash nowhere-vps.sh update [--version v1.5.1]
   sudo bash nowhere-vps.sh versions
   sudo bash nowhere-vps.sh start|stop|restart|status|logs|link
   sudo bash nowhere-vps.sh fingerprint
@@ -147,8 +159,9 @@ No arguments opens the interactive menu. Press Enter in the installer wizard to
 keep every default value.
 
 Options:
-  --protocol legacy|vector  legacy=Anywhere (<=v1.4), vector=Native Vector (>=v1.5)
-  --version v1.5.0         Exact GitHub Release version to install
+  --protocol legacy|modern  Server protocol generation; selected automatically by version
+  --client anywhere|vector|both  Client links to print for v1.5+
+  --version v1.5.1         Exact GitHub Release version to install
   --port 2077              Portal listen port
   --key secret             Shared key
   --spec nightfall         Optional protocol spec seed
@@ -167,9 +180,10 @@ Options:
   --pool 5                 TCP pool: Anywhere 0..9, Native Vector 0..256
   --vector-socks addr      Native Vector local SOCKS5 listener
   --sni name|none          Native Vector certificate verification name
+  --pin sha256|none        Native Vector lowercase leaf certificate SHA-256 pin
 
 Environment variables with the same names are also supported, for example:
-  NOWHERE_PORT=443 NOWHERE_NET=mix sudo -E bash nowhere-vps.sh install-legacy --yes
+  NOWHERE_PORT=443 NOWHERE_NET=mix sudo -E bash nowhere-vps.sh install-anywhere --yes
 EOF
 }
 
@@ -371,6 +385,7 @@ print_config_summary() {
   echo
   echo "配置确认："
   echo "  协议模式:          $(protocol_label "${NOWHERE_PROTOCOL:-legacy}")"
+  echo "  客户端输出:        $(client_label "${NOWHERE_CLIENT:-anywhere}")"
   echo "  Release:           ${NOWHERE_VERSION:-}"
   echo "  公网域名/IP:       $(display_empty "${NOWHERE_PUBLIC_HOST:-}" "<自动探测失败，稍后可重新配置>")"
   echo "  监听地址:          $(display_empty "${NOWHERE_LISTEN_HOST:-}" "<空，IPv4/IPv6 wildcard>")"
@@ -391,9 +406,10 @@ print_config_summary() {
   echo "  SOCKS5 出站:       $(display_socks "${NOWHERE_SOCKS:-none}")"
   echo "  Log:               ${NOWHERE_LOG:-}"
   echo "  TCP Pool:          ${NOWHERE_POOL:-}"
-  if [[ "${NOWHERE_PROTOCOL:-legacy}" == "vector" ]]; then
+  if [[ "${NOWHERE_CLIENT:-anywhere}" == "vector" || "${NOWHERE_CLIENT:-anywhere}" == "both" ]]; then
     echo "  Vector SOCKS5:     ${NOWHERE_VECTOR_SOCKS:-}"
     echo "  Vector SNI:        ${NOWHERE_VECTOR_SNI:-none}"
+    echo "  Vector Pin:        ${NOWHERE_VECTOR_PIN:-none}"
   fi
 }
 
@@ -445,16 +461,33 @@ read_value() {
 normalize_protocol() {
   case "${1:-}" in
     legacy|anywhere) printf 'legacy' ;;
-    vector|v15|modern) printf 'vector' ;;
+    vector|v15|modern) printf 'modern' ;;
     *) return 1 ;;
   esac
 }
 
+normalize_client() {
+  case "${1:-}" in
+    anywhere) printf 'anywhere' ;;
+    vector) printf 'vector' ;;
+    both) printf 'both' ;;
+    *) return 1 ;;
+  esac
+}
+
+client_label() {
+  case "${1:-anywhere}" in
+    anywhere) printf 'Anywhere 2.0' ;;
+    vector) printf 'Native Vector' ;;
+    both) printf 'Anywhere 2.0 + Native Vector' ;;
+  esac
+}
+
 protocol_label() {
-  if [[ "${1:-legacy}" == "vector" ]]; then
-    printf 'Native Vector (v1.5+)'
+  if [[ "${1:-legacy}" == "modern" ]]; then
+    printf 'Nowhere v1.5+ protocol'
   else
-    printf 'Anywhere compatible (v1.4 and earlier)'
+    printf 'Legacy protocol (v1.4 and earlier)'
   fi
 }
 
@@ -477,15 +510,15 @@ version_at_least() {
 
 protocol_for_version() {
   if version_at_least "$1" 1 5 0; then
-    printf 'vector'
+    printf 'modern'
   else
     printf 'legacy'
   fi
 }
 
 default_version_for_protocol() {
-  if [[ "${1:-legacy}" == "vector" ]]; then
-    printf '%s' "$DEFAULT_VECTOR_VERSION"
+  if [[ "${1:-legacy}" == "modern" ]]; then
+    printf '%s' "$DEFAULT_MODERN_VERSION"
   else
     printf '%s' "$DEFAULT_LEGACY_VERSION"
   fi
@@ -630,12 +663,25 @@ validate_config_values() {
   validate_nonnegative_int "$NOWHERE_ETAR" || die "NOWHERE_ETAR must be a non-negative integer."
   validate_socks "$NOWHERE_SOCKS" || die "NOWHERE_SOCKS must be none, host:port, or user:pass@host:port. IPv6 endpoints require brackets."
   [[ "$NOWHERE_LOG" == "none" || "$NOWHERE_LOG" == "debug" || "$NOWHERE_LOG" == "info" || "$NOWHERE_LOG" == "warn" || "$NOWHERE_LOG" == "error" || "$NOWHERE_LOG" == "event" ]] || die "Invalid log level: ${NOWHERE_LOG}"
-  if [[ "$NOWHERE_PROTOCOL" == "vector" ]]; then
+  NOWHERE_CLIENT="$(normalize_client "$NOWHERE_CLIENT")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
+  if [[ "$NOWHERE_PROTOCOL" == "legacy" && "$NOWHERE_CLIENT" != "anywhere" ]]; then
+    die "Nowhere versions before v1.5 only support the Anywhere client output."
+  fi
+  if [[ "$NOWHERE_CLIENT" != "anywhere" && "$NOWHERE_VECTOR_PIN" != "none" ]] && ! version_at_least "$NOWHERE_VERSION" 1 5 1; then
+    die "NOWHERE_VECTOR_PIN requires Nowhere v1.5.1 or newer."
+  fi
+  if [[ "$NOWHERE_CLIENT" == "vector" ]]; then
     [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 256 ]] || die "NOWHERE_POOL must be 0..256 for Native Vector."
     validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "NOWHERE_VECTOR_SOCKS must be [user:pass@]host:port or :port."
     [[ "$NOWHERE_VECTOR_SNI" == "none" || "$NOWHERE_VECTOR_SNI" =~ ^[A-Za-z0-9.-]+$ ]] || die "NOWHERE_VECTOR_SNI must be a DNS name or none."
+    [[ "$NOWHERE_VECTOR_PIN" == "none" || "$NOWHERE_VECTOR_PIN" =~ ^[0-9a-f]{64}$ ]] || die "NOWHERE_VECTOR_PIN must be none or 64 lowercase hexadecimal characters."
   else
-    [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 9 ]] || die "NOWHERE_POOL must be 0..9 for Anywhere."
+    [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 9 ]] || die "NOWHERE_POOL must be 0..9 when Anywhere links are enabled."
+    if [[ "$NOWHERE_CLIENT" == "both" ]]; then
+      validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "NOWHERE_VECTOR_SOCKS must be [user:pass@]host:port or :port."
+      [[ "$NOWHERE_VECTOR_SNI" == "none" || "$NOWHERE_VECTOR_SNI" =~ ^[A-Za-z0-9.-]+$ ]] || die "NOWHERE_VECTOR_SNI must be a DNS name or none."
+      [[ "$NOWHERE_VECTOR_PIN" == "none" || "$NOWHERE_VECTOR_PIN" =~ ^[0-9a-f]{64}$ ]] || die "NOWHERE_VECTOR_PIN must be none or 64 lowercase hexadecimal characters."
+    fi
   fi
   validate_version_protocol
   if [[ "$NOWHERE_PROTOCOL" == "legacy" ]] && ! version_at_least "$NOWHERE_VERSION" 1 2 4 && [[ "$NOWHERE_SOCKS" != "none" && -n "$NOWHERE_SOCKS" ]]; then
@@ -685,7 +731,7 @@ build_portal_url() {
   printf 'portal://%s@%s:%s?%s' "$encoded_key" "$host_part" "$NOWHERE_PORT" "$query"
 }
 
-build_legacy_client_query() {
+build_anywhere_client_query() {
   local up="$1"
   local down="$2"
   local query
@@ -699,7 +745,7 @@ build_legacy_client_query() {
   if [[ "$up" == "tcp" && "$down" == "tcp" ]]; then
     query="${query}&pool=${NOWHERE_POOL_VALUE:-$DEFAULT_POOL}"
   fi
-  if [[ -n "${NOWHERE_SPEC_VALUE:-}" ]]; then
+  if ! version_at_least "${NOWHERE_VERSION_VALUE:-$DEFAULT_LEGACY_VERSION}" 1 5 0 && [[ -n "${NOWHERE_SPEC_VALUE:-}" ]]; then
     query="${query}&spec=$(urlencode "$NOWHERE_SPEC_VALUE")"
   fi
   if [[ -n "${NOWHERE_ALPN_VALUE:-}" && "$NOWHERE_ALPN_VALUE" != "$DEFAULT_ALPN" ]]; then
@@ -718,6 +764,9 @@ build_vector_query() {
     query="${query}&pool=${NOWHERE_POOL_VALUE:-$DEFAULT_POOL}"
   fi
   query="${query}&sni=$(urlencode "${NOWHERE_VECTOR_SNI_VALUE:-$DEFAULT_VECTOR_SNI}")"
+  if version_at_least "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}" 1 5 1; then
+    query="${query}&pin=$(urlencode "${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_VECTOR_PIN}")"
+  fi
   if [[ -n "${NOWHERE_ALPN_VALUE:-}" && "$NOWHERE_ALPN_VALUE" != "$DEFAULT_ALPN" ]]; then
     query="${query}&alpn=$(urlencode "$NOWHERE_ALPN_VALUE")"
   fi
@@ -740,15 +789,27 @@ default_vector_sni_for() {
 configure_values() {
   load_config
 
-  local generated_key generated_spec detected_host default_tls normalized_protocol saved_protocol
+  local generated_key generated_spec detected_host default_tls normalized_protocol saved_protocol saved_client
   generated_key="$(random_token 24)"
   generated_spec="$(random_token 12)"
   detected_host="$(detect_public_host)"
 
   saved_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL_VALUE:-$DEFAULT_PROTOCOL}")" || saved_protocol="$DEFAULT_PROTOCOL"
-  normalized_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL:-$saved_protocol}")" || die "NOWHERE_PROTOCOL must be legacy or vector."
+  normalized_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL:-$saved_protocol}")" || die "NOWHERE_PROTOCOL must be legacy or modern."
   NOWHERE_PROTOCOL="$normalized_protocol"
   NOWHERE_VERSION="${NOWHERE_VERSION:-${NOWHERE_VERSION_VALUE:-$(default_version_for_protocol "$NOWHERE_PROTOCOL")}}"
+  if [[ -n "${NOWHERE_CLIENT_VALUE:-}" ]]; then
+    saved_client="$(normalize_client "$NOWHERE_CLIENT_VALUE")" || saved_client="$DEFAULT_CLIENT"
+  elif [[ "${NOWHERE_PROTOCOL_VALUE:-}" == "vector" ]]; then
+    saved_client="vector"
+  else
+    saved_client="$DEFAULT_CLIENT"
+  fi
+  if [[ "$NOWHERE_PROTOCOL" == "legacy" ]]; then
+    NOWHERE_CLIENT="anywhere"
+  else
+    NOWHERE_CLIENT="$(normalize_client "${NOWHERE_CLIENT:-$saved_client}")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
+  fi
 
   NOWHERE_PORT="${NOWHERE_PORT:-${NOWHERE_PORT_VALUE:-$DEFAULT_PORT}}"
   NOWHERE_KEY="${NOWHERE_KEY:-${NOWHERE_KEY_VALUE:-$generated_key}}"
@@ -771,6 +832,7 @@ configure_values() {
   fi
   NOWHERE_VECTOR_SOCKS="${NOWHERE_VECTOR_SOCKS:-${NOWHERE_VECTOR_SOCKS_VALUE:-$DEFAULT_VECTOR_SOCKS}}"
   NOWHERE_VECTOR_SNI="${NOWHERE_VECTOR_SNI:-${NOWHERE_VECTOR_SNI_VALUE:-}}"
+  NOWHERE_VECTOR_PIN="${NOWHERE_VECTOR_PIN:-${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_VECTOR_PIN}}"
   NOWHERE_PUBLIC_HOST="${NOWHERE_PUBLIC_HOST:-${NOWHERE_PUBLIC_HOST_VALUE:-$detected_host}}"
   NOWHERE_LISTEN_HOST="${NOWHERE_LISTEN_HOST:-${NOWHERE_LISTEN_HOST_VALUE:-}}"
   NOWHERE_CRT="${NOWHERE_CRT:-${NOWHERE_CRT_VALUE:-}}"
@@ -783,6 +845,9 @@ configure_values() {
 
   if [[ "$ASSUME_YES" -eq 0 ]]; then
     info "进入 $(protocol_label "$NOWHERE_PROTOCOL") 配置向导：一路回车即可使用默认值。"
+    if [[ "$NOWHERE_PROTOCOL" == "modern" ]]; then
+      NOWHERE_CLIENT="$(read_value "客户端链接 anywhere/vector/both" "$NOWHERE_CLIENT")"
+    fi
     NOWHERE_PUBLIC_HOST="$(read_value "公网域名/IP，用于客户端连接" "$NOWHERE_PUBLIC_HOST")"
     NOWHERE_LISTEN_HOST="$(read_value "监听地址，留空表示 IPv4/IPv6 全部监听" "$NOWHERE_LISTEN_HOST")"
     NOWHERE_PORT="$(read_value "监听端口" "$NOWHERE_PORT")"
@@ -802,19 +867,24 @@ configure_values() {
     NOWHERE_DIAL="$(read_value "出站源 IP，auto 表示系统默认" "$NOWHERE_DIAL")"
     NOWHERE_SOCKS="$(read_value "SOCKS5 出站代理，none/host:port/user:pass@host:port" "$NOWHERE_SOCKS")"
     NOWHERE_LOG="$(read_value "日志级别 none/debug/info/warn/error/event" "$NOWHERE_LOG")"
-    if [[ "$NOWHERE_PROTOCOL" == "vector" ]]; then
-      NOWHERE_POOL="$(read_value "Native Vector TCP pool，0..256" "$NOWHERE_POOL")"
+    if [[ "$NOWHERE_CLIENT" == "vector" || "$NOWHERE_CLIENT" == "both" ]]; then
+      if [[ "$NOWHERE_CLIENT" == "both" ]]; then
+        NOWHERE_POOL="$(read_value "TCP pool（Anywhere 限制为 0..9）" "$NOWHERE_POOL")"
+      else
+        NOWHERE_POOL="$(read_value "Native Vector TCP pool，0..256" "$NOWHERE_POOL")"
+      fi
       NOWHERE_VECTOR_SOCKS="$(read_value "Vector 本地 SOCKS5 监听地址" "$NOWHERE_VECTOR_SOCKS")"
       if [[ -z "$NOWHERE_VECTOR_SNI" ]]; then
         NOWHERE_VECTOR_SNI="$(default_vector_sni_for "$NOWHERE_PUBLIC_HOST" "$NOWHERE_TLS")"
       fi
       NOWHERE_VECTOR_SNI="$(read_value "Vector SNI，none 表示不校验证书" "$NOWHERE_VECTOR_SNI")"
+      NOWHERE_VECTOR_PIN="$(read_value "Vector 证书 SHA-256 pin，none 表示不固定证书" "$NOWHERE_VECTOR_PIN")"
     else
       NOWHERE_POOL="$(read_value "Anywhere TCP pool，0..9" "$NOWHERE_POOL")"
     fi
   fi
 
-  if [[ "$NOWHERE_PROTOCOL" == "vector" && -z "$NOWHERE_VECTOR_SNI" ]]; then
+  if [[ "$NOWHERE_CLIENT" == "vector" || "$NOWHERE_CLIENT" == "both" ]] && [[ -z "$NOWHERE_VECTOR_SNI" ]]; then
     NOWHERE_VECTOR_SNI="$(default_vector_sni_for "$NOWHERE_PUBLIC_HOST" "$NOWHERE_TLS")"
   fi
 
@@ -831,6 +901,7 @@ save_config() {
   cat >"$CONFIG_FILE" <<EOF
 NOWHERE_PORTAL=$(env_quote "$NOWHERE_PORTAL")
 NOWHERE_PROTOCOL_VALUE=$(env_quote "$NOWHERE_PROTOCOL")
+NOWHERE_CLIENT_VALUE=$(env_quote "$NOWHERE_CLIENT")
 NOWHERE_VERSION_VALUE=$(env_quote "$NOWHERE_VERSION")
 NOWHERE_PUBLIC_HOST_VALUE=$(env_quote "$NOWHERE_PUBLIC_HOST")
 NOWHERE_LISTEN_HOST_VALUE=$(env_quote "$NOWHERE_LISTEN_HOST")
@@ -850,6 +921,7 @@ NOWHERE_LOG_VALUE=$(env_quote "$NOWHERE_LOG")
 NOWHERE_POOL_VALUE=$(env_quote "$NOWHERE_POOL")
 NOWHERE_VECTOR_SOCKS_VALUE=$(env_quote "$NOWHERE_VECTOR_SOCKS")
 NOWHERE_VECTOR_SNI_VALUE=$(env_quote "$NOWHERE_VECTOR_SNI")
+NOWHERE_VECTOR_PIN_VALUE=$(env_quote "$NOWHERE_VECTOR_PIN")
 EOF
   chmod 600 "$CONFIG_FILE"
   info "Config saved to ${CONFIG_FILE}"
@@ -875,7 +947,7 @@ install_binary() {
 
   local version="${1:-${NOWHERE_VERSION:-}}"
   local asset url tmpdir binary
-  validate_release_version "$version" || die "An exact release version such as v1.5.0 is required."
+  validate_release_version "$version" || die "An exact release version such as v1.5.1 is required."
   asset="$(detect_asset)"
   url="https://github.com/${REPO}/releases/download/${version}/${asset}"
   tmpdir="$(mktemp -d)"
@@ -945,9 +1017,17 @@ print_links() {
   load_config
   [[ -n "${NOWHERE_KEY_VALUE:-}" ]] || die "No config found. Run install or configure first."
 
-  local protocol version host host_part encoded_key encoded_name base udp_link tcp_link tcp_udp_link udp_tcp_link
+  local protocol client version host host_part encoded_key encoded_name base udp_link tcp_link tcp_udp_link udp_tcp_link
   local import_udp import_tcp import_tcp_udp import_udp_tcp
   protocol="$(normalize_protocol "${NOWHERE_PROTOCOL_VALUE:-$DEFAULT_PROTOCOL}")" || die "Invalid saved protocol mode."
+  if [[ -n "${NOWHERE_CLIENT_VALUE:-}" ]]; then
+    client="$(normalize_client "$NOWHERE_CLIENT_VALUE")" || client="$DEFAULT_CLIENT"
+  elif [[ "${NOWHERE_PROTOCOL_VALUE:-}" == "vector" ]]; then
+    client="vector"
+  else
+    client="$DEFAULT_CLIENT"
+  fi
+  [[ "$protocol" == "legacy" ]] && client="anywhere"
   version="${NOWHERE_VERSION_VALUE:-$(default_version_for_protocol "$protocol")}"
   host="${NOWHERE_PUBLIC_HOST_VALUE:-}"
   [[ -n "$host" ]] || host="$(detect_public_host)"
@@ -957,13 +1037,14 @@ print_links() {
 
   echo
   echo "Protocol mode: $(protocol_label "$protocol")"
+  echo "Client output: $(client_label "$client")"
   echo "Release: ${version}"
   echo
   echo "Portal URL:"
   echo "  ${NOWHERE_PORTAL:-}"
   echo
 
-  if [[ "$protocol" == "vector" ]]; then
+  if [[ "$client" == "vector" || "$client" == "both" ]]; then
     base="vector://${encoded_key}@${host_part}:${NOWHERE_PORT_VALUE}"
     udp_link="${base}?$(build_vector_query udp udp)"
     tcp_link="${base}?$(build_vector_query tcp tcp)"
@@ -996,17 +1077,20 @@ print_links() {
       echo "Run one URL on a v1.5+ client, for example:"
       echo "  nowhere '${udp_link}'"
     fi
-  else
+    [[ "$client" == "both" ]] && echo
+  fi
+
+  if [[ "$client" == "anywhere" || "$client" == "both" ]]; then
     encoded_name="$(urlencode "Nowhere VPS")"
     base="nowhere://${encoded_key}@${host_part}:${NOWHERE_PORT_VALUE}"
-    udp_link="${base}?$(build_legacy_client_query udp udp)#${encoded_name}"
-    tcp_link="${base}?$(build_legacy_client_query tcp tcp)#${encoded_name}"
+    udp_link="${base}?$(build_anywhere_client_query udp udp)#${encoded_name}"
+    tcp_link="${base}?$(build_anywhere_client_query tcp tcp)#${encoded_name}"
     import_udp="anywhere://add-proxy?link=$(urlencode "$udp_link")"
     import_tcp="anywhere://add-proxy?link=$(urlencode "$tcp_link")"
 
     if version_at_least "$version" 1 3 0; then
-      tcp_udp_link="${base}?$(build_legacy_client_query tcp udp)#${encoded_name}"
-      udp_tcp_link="${base}?$(build_legacy_client_query udp tcp)#${encoded_name}"
+      tcp_udp_link="${base}?$(build_anywhere_client_query tcp udp)#${encoded_name}"
+      udp_tcp_link="${base}?$(build_anywhere_client_query udp tcp)#${encoded_name}"
       import_tcp_udp="anywhere://add-proxy?link=$(urlencode "$tcp_udp_link")"
       import_udp_tcp="anywhere://add-proxy?link=$(urlencode "$udp_tcp_link")"
     fi
@@ -1031,7 +1115,7 @@ print_links() {
       echo "  ${tcp_link}"
       if version_at_least "$version" 1 3 0 && [[ -z "${NOWHERE_SOCKS_VALUE:-}" || "${NOWHERE_SOCKS_VALUE}" == "$DEFAULT_SOCKS" ]]; then
         echo
-        echo "Anywhere import links (split carriers, v1.3-v1.4):"
+        echo "Anywhere import links (split carriers):"
         echo "  up=tcp/down=udp: ${tcp_udp_link}"
         echo "  up=udp/down=tcp: ${udp_tcp_link}"
       fi
@@ -1062,8 +1146,10 @@ print_links() {
   if [[ "${NOWHERE_TLS_VALUE:-1}" == "1" ]]; then
     echo
     echo "TLS note:"
-    if [[ "$protocol" == "vector" ]]; then
+    if [[ "$client" == "vector" ]]; then
       echo "  Native Vector uses sni=none to disable verification for tls=1; it does not accept an Anywhere fingerprint."
+    elif [[ "$client" == "both" ]]; then
+      echo "  Anywhere can trust the current SHA-256; Native Vector uses sni=none unless configured otherwise."
     else
       echo "  tls=1 uses an ephemeral self-signed certificate. Trust the current SHA-256 in Anywhere or use tls=2."
     fi
@@ -1090,6 +1176,7 @@ install_all() {
 
 install_legacy_all() {
   NOWHERE_PROTOCOL="legacy"
+  NOWHERE_CLIENT="anywhere"
   if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
     NOWHERE_VERSION="$DEFAULT_LEGACY_VERSION"
   fi
@@ -1097,9 +1184,19 @@ install_legacy_all() {
 }
 
 install_vector_all() {
-  NOWHERE_PROTOCOL="vector"
+  NOWHERE_PROTOCOL="modern"
+  NOWHERE_CLIENT="vector"
   if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
     NOWHERE_VERSION="$DEFAULT_VECTOR_VERSION"
+  fi
+  install_all
+}
+
+install_anywhere_all() {
+  NOWHERE_PROTOCOL="modern"
+  NOWHERE_CLIENT="anywhere"
+  if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
+    NOWHERE_VERSION="$DEFAULT_MODERN_VERSION"
   fi
   install_all
 }
@@ -1109,26 +1206,31 @@ install_by_protocol() {
   if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then
     requested_protocol="$(protocol_for_version "$NOWHERE_VERSION")"
   else
-    requested_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL:-$DEFAULT_PROTOCOL}")" || die "NOWHERE_PROTOCOL must be legacy or vector."
+    requested_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL:-$DEFAULT_PROTOCOL}")" || die "NOWHERE_PROTOCOL must be legacy or modern."
   fi
-  if [[ "$requested_protocol" == "vector" ]]; then
-    install_vector_all
+  if [[ "$requested_protocol" == "modern" ]]; then
+    NOWHERE_PROTOCOL="modern"
+    NOWHERE_CLIENT="$(normalize_client "${NOWHERE_CLIENT:-$DEFAULT_CLIENT}")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
+    if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
+      NOWHERE_VERSION="$DEFAULT_MODERN_VERSION"
+    fi
+    install_all
   else
     install_legacy_all
   fi
 }
 
-quick_install_legacy_all() {
-  ASSUME_YES=1 install_legacy_all
+quick_install_anywhere_all() {
+  ASSUME_YES=1 install_anywhere_all
 }
 
 configure_all() {
   require_root
   require_systemd
   load_config
-  [[ -n "${NOWHERE_PROTOCOL_VALUE:-}" ]] || warn "旧配置未记录协议模式，将按 Anywhere compatible 处理。"
+  [[ -n "${NOWHERE_PROTOCOL_VALUE:-}" ]] || warn "旧配置未记录协议模式，将按已安装版本自动判断。"
   local saved_protocol
-  saved_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL_VALUE:-$DEFAULT_PROTOCOL}")" || die "Invalid saved protocol mode."
+  saved_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL_VALUE:-$(protocol_for_version "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}")}")" || die "Invalid saved protocol mode."
   if [[ -n "${NOWHERE_PROTOCOL:-}" ]]; then
     [[ "$(normalize_protocol "$NOWHERE_PROTOCOL")" == "$saved_protocol" ]] || die "Use install/versions to switch protocol generations safely."
   fi
@@ -1147,13 +1249,60 @@ configure_all() {
   print_links
 }
 
+update_saved_version() {
+  local version="$1"
+  local replacement tmp
+  replacement="NOWHERE_VERSION_VALUE=$(env_quote "$version")"
+  tmp="$(mktemp "${CONFIG_FILE}.tmp.XXXXXX")"
+  awk -v replacement="$replacement" '
+    BEGIN { updated = 0 }
+    /^NOWHERE_VERSION_VALUE=/ { print replacement; updated = 1; next }
+    { print }
+    END { if (!updated) print replacement }
+  ' "$CONFIG_FILE" >"$tmp"
+  chmod 600 "$tmp"
+  mv -f "$tmp" "$CONFIG_FILE"
+}
+
 update_all() {
-  if [[ -n "${NOWHERE_VERSION:-}" ]]; then
-    NOWHERE_PROTOCOL="$(protocol_for_version "$NOWHERE_VERSION")"
+  require_root
+  require_systemd
+  load_config
+  [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No existing installation config found. Run install first."
+
+  local old_protocol new_protocol selected
+  old_protocol="$(normalize_protocol "${NOWHERE_PROTOCOL_VALUE:-$(protocol_for_version "$NOWHERE_VERSION_VALUE")}")" || die "Invalid saved protocol mode."
+  if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then
+    selected="$NOWHERE_VERSION"
+    validate_release_version "$selected" || die "Invalid release version: ${selected}"
+  else
+    if ! choose_release_version; then
+      info "已取消二进制更新。"
+      return 0
+    fi
+    selected="$SELECTED_VERSION"
+  fi
+  new_protocol="$(protocol_for_version "$selected")"
+
+  if [[ "$new_protocol" != "$old_protocol" ]]; then
+    warn "${NOWHERE_VERSION_VALUE} 到 ${selected} 跨越 v1.5 协议边界，需要迁移配置。"
+    NOWHERE_VERSION="$selected"
+    NOWHERE_PROTOCOL="$new_protocol"
+    unset NOWHERE_SPEC
     install_all
     return
   fi
-  install_selected_release
+
+  install_binary "$selected"
+  update_saved_version "$selected"
+  if systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1; then
+    systemctl restart "$SERVICE_NAME"
+    info "Nowhere binary updated from ${NOWHERE_VERSION_VALUE} to ${selected}; service restarted."
+  else
+    info "Nowhere binary updated from ${NOWHERE_VERSION_VALUE} to ${selected}; service is not running."
+  fi
+  print_links
+  print_tls_fingerprint
 }
 
 install_selected_release() {
@@ -1167,9 +1316,6 @@ install_selected_release() {
   NOWHERE_PROTOCOL="$(protocol_for_version "$NOWHERE_VERSION")"
   echo
   info "已选择 ${NOWHERE_VERSION}，将使用 $(protocol_label "$NOWHERE_PROTOCOL") 配置。"
-  if [[ "$NOWHERE_PROTOCOL" == "vector" ]]; then
-    warn "v1.5+ 与 Anywhere 不兼容；客户端必须运行同版本 Native Vector。"
-  fi
   install_all
 }
 
@@ -1191,36 +1337,40 @@ menu() {
 ==============================
  Nowhere VPS 管理脚本
 ==============================
-  1) 安装/重装 Anywhere 兼容版 (${DEFAULT_LEGACY_VERSION})
-  2) 安装/重装 Native Vector 版 (${DEFAULT_VECTOR_VERSION})
-  3) 快速默认安装 Anywhere 兼容版（不提问）
+  1) 安装/重装新版（Anywhere 2.0，${DEFAULT_MODERN_VERSION}）
+  2) 安装/重装新版（Native Vector，${DEFAULT_VECTOR_VERSION}）
+  3) 快速默认安装（Anywhere 2.0，${DEFAULT_MODERN_VERSION}）
   4) 修改当前协议模式配置（向导）
   5) 指定 Release 安装/切换（最近 10 个版本）
-  6) 启动服务
-  7) 停止服务
-  8) 重启服务
-  9) 查看状态
- 10) 查看日志
- 11) 打印客户端链接/命令
- 12) 查看 tls=1 自签证书 SHA-256
- 13) 卸载服务
+  6) 更新 Nowhere 二进制（保留当前配置）
+  7) 安装/重装旧版（Anywhere 1.x，${DEFAULT_LEGACY_VERSION}）
+  8) 启动服务
+  9) 停止服务
+ 10) 重启服务
+ 11) 查看状态
+ 12) 查看日志
+ 13) 打印客户端链接/命令
+ 14) 查看 tls=1 自签证书 SHA-256
+ 15) 卸载服务
   0) 退出
 EOF
     read -r -p "请输入数字: " choice
     case "$choice" in
-      1) install_legacy_all ;;
+      1) install_anywhere_all ;;
       2) install_vector_all ;;
-      3) quick_install_legacy_all ;;
+      3) quick_install_anywhere_all ;;
       4) configure_all ;;
       5) install_selected_release ;;
-      6) start_service ;;
-      7) service_cmd stop ;;
-      8) restart_service ;;
-      9) service_cmd status ;;
-      10) journalctl -u "$SERVICE_NAME" -f ;;
-      11) print_links ;;
-      12) print_tls_fingerprint ;;
-      13) uninstall_all ;;
+      6) update_all ;;
+      7) install_legacy_all ;;
+      8) start_service ;;
+      9) service_cmd stop ;;
+      10) restart_service ;;
+      11) service_cmd status ;;
+      12) journalctl -u "$SERVICE_NAME" -f ;;
+      13) print_links ;;
+      14) print_tls_fingerprint ;;
+      15) uninstall_all ;;
       0) exit 0 ;;
       *) warn "未知选项：${choice}" ;;
     esac
@@ -1229,6 +1379,7 @@ EOF
 
 case "$ACTION" in
   install) install_by_protocol ;;
+  install-anywhere|anywhere) install_anywhere_all ;;
   install-legacy) install_legacy_all ;;
   install-vector|vector) install_vector_all ;;
   configure|config) configure_all ;;
