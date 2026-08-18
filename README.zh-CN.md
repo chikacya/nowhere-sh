@@ -14,6 +14,7 @@ Linux VPS 一键部署和管理脚本。
 - 自动创建和管理 systemd 服务。
 - 支持 `mix`、`tcp`、`udp`、TLS、限速、SOCKS5 上游和日志配置。
 - 输出 Anywhere 2.0 的 `nowhere://` 链接和 Native Vector 的 `vector://` URL。
+- 为推荐 Anywhere `nowhere://` 链接输出终端二维码。
 - 可从管理菜单打开 Nowhere v1.6+ 的只读 Terminal UI。
 - 输出 `tls=1` 临时自签证书的 SHA-256 fingerprint。
 

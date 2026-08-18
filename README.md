@@ -15,6 +15,7 @@ Linux VPS.
 - Creates and manages a systemd service.
 - Supports `mix`, `tcp`, and `udp`, TLS modes, rate limits, SOCKS5 upstream, and logs.
 - Generates Anywhere 2.0 `nowhere://` links and Native Vector `vector://` URLs.
+- Prints a terminal QR code for the recommended Anywhere `nowhere://` link.
 - Opens the Nowhere v1.6+ read-only Terminal UI from the management menu.
 - Prints the SHA-256 fingerprint of an ephemeral `tls=1` certificate.
 

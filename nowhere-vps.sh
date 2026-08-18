@@ -190,6 +190,40 @@ require_systemd() {
   [[ -d /run/systemd/system ]] || warn "systemd 看起来未运行，服务管理命令可能失败。"
 }
 
+install_qrencode() {
+  command -v qrencode >/dev/null 2>&1 && return 0
+
+  info "Installing qrencode for terminal QR output..."
+  if command -v apt-get >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qrencode
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y qrencode
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y qrencode
+  elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache qrencode
+  else
+    warn "qrencode is not installed and no supported package manager was found."
+    return 1
+  fi
+
+  command -v qrencode >/dev/null 2>&1 || {
+    warn "Could not install qrencode; QR code output was skipped."
+    return 1
+  }
+}
+
+print_qr_code() {
+  local link="$1" label="$2"
+  [[ -n "$link" ]] || return 0
+
+  install_qrencode || return 0
+  echo
+  echo "QR code (${label}):"
+  qrencode -t ANSIUTF8 -m 1 -s 1 "$link" || warn "Could not render the QR code."
+}
+
 env_quote() {
   local value="${1//$'\n'/}"
   value="${value//\\/\\\\}"
@@ -962,7 +996,7 @@ print_links() {
   load_config
   [[ -n "${NOWHERE_KEY_VALUE:-}" ]] || die "No config found. Run install or configure first."
 
-  local client version host host_part encoded_key encoded_name base udp_link tcp_link tcp_udp_link udp_tcp_link
+  local client version host host_part encoded_key encoded_name base udp_link tcp_link tcp_udp_link udp_tcp_link qr_link
   local import_udp import_tcp import_tcp_udp import_udp_tcp
   if [[ -n "${NOWHERE_CLIENT_VALUE:-}" ]]; then
     client="$(normalize_client "$NOWHERE_CLIENT_VALUE")" || client="$DEFAULT_CLIENT"
@@ -1035,18 +1069,21 @@ print_links() {
     import_udp_tcp="anywhere://add-proxy?link=$(urlencode "$udp_tcp_link")"
 
     if [[ "${NOWHERE_NET_VALUE:-mix}" == "tcp" ]]; then
+      qr_link="$tcp_link"
       echo "Anywhere import link (TLS/TCP):"
       echo "  ${tcp_link}"
       echo
       echo "Anywhere deep link:"
       echo "  ${import_tcp}"
     elif [[ "${NOWHERE_NET_VALUE:-mix}" == "udp" ]]; then
+      qr_link="$udp_link"
       echo "Anywhere import link (QUIC/UDP):"
       echo "  ${udp_link}"
       echo
       echo "Anywhere deep link:"
       echo "  ${import_udp}"
     else
+      qr_link="$udp_link"
       echo "Anywhere import link (QUIC/UDP recommended):"
       echo "  ${udp_link}"
       echo
@@ -1072,6 +1109,8 @@ print_links() {
       fi
     fi
   fi
+
+  print_qr_code "${qr_link:-}" "Anywhere nowhere:// link"
 
   echo
   echo "Firewall reminder:"
