@@ -22,13 +22,14 @@ Linux VPS.
 ## Compatibility
 
 This script supports Nowhere v1.5 and later, which Anywhere 2.0 supports.
-Nowhere v1.6 adds local telemetry and the TUI without changing the v1 wire
-protocol.
+The default is Nowhere v1.8.0. It replaces the previous TCP `pool` setting with
+optional Native Vector TLS Mux (`mux=0|1`).
 
 | Portal release | Client | URL | Notes |
 | --- | --- | --- | --- |
-| v1.5+ | Anywhere 2.0 | `nowhere://...` | Pool is `0..9` |
-| v1.5+ | Native Vector | `vector://...` | Local SOCKS5 client; pool is `0..256` |
+| v1.8+ | Anywhere 2.0 | `nowhere://...` | No `pool` parameter |
+| v1.8+ | Native Vector | `vector://...` | Local SOCKS5 client; `mux=0|1` |
+| v1.5-v1.7 | Anywhere 2.0 / Native Vector | matching URL | Legacy `pool` is retained for selected releases |
 
 A v1.5+ Portal can serve Anywhere 2.0 or Native Vector clients using the
 matching URL. Releases before v1.5 are intentionally not offered.
@@ -47,7 +48,7 @@ chmod +x nowhere-vps.sh
 sudo bash nowhere-vps.sh
 ```
 
-The default menu entry installs Nowhere v1.6.0 for Anywhere 2.0. Press Enter at
+The default menu entry installs Nowhere v1.8.0 for Anywhere 2.0. Press Enter at
 every wizard prompt to accept the defaults.
 
 ```text
@@ -84,7 +85,7 @@ selected binary, preserves `/etc/nowhere/nowhere.env`, and restarts the service.
 
 ```bash
 sudo bash nowhere-vps.sh update
-sudo bash nowhere-vps.sh update --version v1.6.0
+sudo bash nowhere-vps.sh update --version v1.8.0
 ```
 
 Menu item `5` is for a full release install or switch and always opens the
@@ -118,7 +119,15 @@ Client links anywhere/vector/both [anywhere]:
 
 - `anywhere`: print `nowhere://` links for Anywhere 2.0.
 - `vector`: print `vector://` URLs and native client commands.
-- `both`: print both types. TCP pool is limited to `0..9` for Anywhere compatibility.
+- `both`: print both types.
+
+For Native Vector on v1.8+, the wizard also asks for TLS Mux. Keep `0` for
+dedicated TLS lanes, or select `1` to use shared TLS Mux Shards. This setting
+does not apply to Anywhere links.
+
+For v1.8+ Portal deployments, choose a QUIC memory profile: `balanced` is the
+default, `memory` favors connection density, and `throughput` raises flow-control
+windows for high-bandwidth, high-latency links.
 
 Anywhere 2.0 example:
 
@@ -176,17 +185,19 @@ Important options:
 
 | Environment variable | CLI option | Default | Description |
 | --- | --- | --- | --- |
-| `NOWHERE_VERSION` | `--version` | `v1.6.0` | Exact release tag |
+| `NOWHERE_VERSION` | `--version` | `v1.8.0` | Exact release tag |
 | `NOWHERE_CLIENT` | `--client` | `anywhere` | `anywhere`, `vector`, or `both` |
 | `NOWHERE_PUBLIC_HOST` | `--public-host` | auto | Public domain or IP |
 | `NOWHERE_PORT` | `--port` | `2077` | Portal port |
 | `NOWHERE_KEY` | `--key` | random | Shared key |
 | `NOWHERE_NET` | `--net` | `mix` | `mix`, `tcp`, or `udp` |
 | `NOWHERE_TLS` | `--tls` | `1` | `1` self-signed, `2` PEM |
-| `NOWHERE_POOL` | `--pool` | `5` | Anywhere `0..9`, Vector `0..256` |
+| `NOWHERE_POOL` | `--pool` | `5` | v1.5-v1.7 legacy TCP pool only |
 | `NOWHERE_VECTOR_SOCKS` | `--vector-socks` | `127.0.0.1:1080` | Vector local SOCKS5 listener |
 | `NOWHERE_VECTOR_SNI` | `--sni` | `none` | Vector TLS verification name |
 | `NOWHERE_VECTOR_PIN` | `--pin` | `none` | v1.5.1+ lowercase certificate SHA-256 pin |
+| `NOWHERE_VECTOR_MUX` | `--mux` | `0` | v1.8+ Vector TLS: `0` dedicated, `1` shared Mux |
+| `NOWHERE_QUIC_MEMORY_PROFILE` | `--quic-memory-profile` | `balanced` | v1.8+ Portal QUIC: `memory`, `balanced`, or `throughput` |
 | `NOWHERE_TELEMETRY_INTERVAL` / `NOW_TELEMETRY_INTERVAL` | `--telemetry-interval` | `1s` | v1.6+ TUI snapshot interval, `250ms..60s` |
 
 Run `bash nowhere-vps.sh --help` for the complete option list.

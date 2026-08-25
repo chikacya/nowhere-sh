@@ -13,9 +13,11 @@ DEFAULT_NET="mix"
 DEFAULT_ALPN="now/1"
 DEFAULT_LOG="info"
 DEFAULT_POOL="5"
+DEFAULT_VECTOR_MUX="0"
+DEFAULT_QUIC_MEMORY_PROFILE="balanced"
 DEFAULT_SOCKS="none"
 DEFAULT_CLIENT="anywhere"
-DEFAULT_MODERN_VERSION="v1.6.0"
+DEFAULT_MODERN_VERSION="v1.8.0"
 DEFAULT_VECTOR_VERSION="$DEFAULT_MODERN_VERSION"
 DEFAULT_TELEMETRY_INTERVAL="1s"
 DEFAULT_VECTOR_SOCKS="127.0.0.1:1080"
@@ -116,6 +118,14 @@ while [[ $# -gt 0 ]]; do
       NOWHERE_VECTOR_PIN="${2:?missing --pin value}"
       shift 2
       ;;
+    --mux)
+      NOWHERE_VECTOR_MUX="${2:?missing --mux value}"
+      shift 2
+      ;;
+    --quic-memory-profile)
+      NOWHERE_QUIC_MEMORY_PROFILE="${2:?missing --quic-memory-profile value}"
+      shift 2
+      ;;
     --telemetry-interval)
       NOWHERE_TELEMETRY_INTERVAL="${2:?missing --telemetry-interval value}"
       shift 2
@@ -144,7 +154,7 @@ Usage:
   sudo bash nowhere-vps.sh install|install-anywhere [--yes] [options]
   sudo bash nowhere-vps.sh install-vector [--yes] [options]
   sudo bash nowhere-vps.sh configure [options]
-  sudo bash nowhere-vps.sh update [--version v1.6.0]
+  sudo bash nowhere-vps.sh update [--version v1.8.0]
   sudo bash nowhere-vps.sh versions
   sudo bash nowhere-vps.sh start|stop|restart|status|tui|logs|link
   sudo bash nowhere-vps.sh fingerprint
@@ -155,7 +165,7 @@ keep every default value.
 
 Options:
   --client anywhere|vector|both  Client links to print for v1.5+
-  --version v1.6.0         Exact GitHub Release version to install
+  --version v1.8.0         Exact GitHub Release version to install
   --port 2077              Portal listen port
   --key secret             Shared key
   --net mix|tcp|udp        Server listener transport
@@ -170,10 +180,12 @@ Options:
   --dial auto              Outbound source IP or auto
   --socks none             SOCKS5 outbound proxy: host:port or user:pass@host:port
   --log info               none|debug|info|warn|error|event
-  --pool 5                 TCP pool: Anywhere 0..9, Native Vector 0..256
+  --pool 5                 TCP pool for v1.5-v1.7 only
   --vector-socks addr      Native Vector local SOCKS5 listener
   --sni name|none          Native Vector certificate verification name
   --pin sha256|none        Native Vector lowercase leaf certificate SHA-256 pin
+  --mux 0|1                Native Vector TLS: 0=dedicated, 1=shared Mux (v1.8+)
+  --quic-memory-profile p  Portal QUIC: memory|balanced|throughput (v1.8+)
   --telemetry-interval 1s  TUI snapshot interval for v1.6+ (250ms..60s)
 
 Environment variables with the same names are also supported, for example:
@@ -430,7 +442,16 @@ print_config_summary() {
   echo "  SOCKS5 出站:       $(display_socks "${NOWHERE_SOCKS:-none}")"
   echo "  Log:               ${NOWHERE_LOG:-}"
   echo "  TUI 遥测间隔:      ${NOWHERE_TELEMETRY_INTERVAL:-$DEFAULT_TELEMETRY_INTERVAL}"
-  echo "  TCP Pool:          ${NOWHERE_POOL:-}"
+  if version_uses_mux "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}"; then
+    echo "  QUIC 内存策略:      ${NOWHERE_QUIC_MEMORY_PROFILE:-$DEFAULT_QUIC_MEMORY_PROFILE}"
+  fi
+  if version_uses_mux "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}"; then
+    if [[ "${NOWHERE_CLIENT:-anywhere}" == "vector" || "${NOWHERE_CLIENT:-anywhere}" == "both" ]]; then
+      echo "  Vector TLS Mux:    ${NOWHERE_VECTOR_MUX:-$DEFAULT_VECTOR_MUX}"
+    fi
+  else
+    echo "  TCP Pool:          ${NOWHERE_POOL:-}"
+  fi
   if [[ "${NOWHERE_CLIENT:-anywhere}" == "vector" || "${NOWHERE_CLIENT:-anywhere}" == "both" ]]; then
     echo "  Vector SOCKS5:     ${NOWHERE_VECTOR_SOCKS:-}"
     echo "  Vector SNI:        ${NOWHERE_VECTOR_SNI:-none}"
@@ -522,6 +543,10 @@ require_supported_version() {
   version_at_least "$1" 1 5 0 || die "Nowhere versions before v1.5 are no longer supported by this script."
 }
 
+version_uses_mux() {
+  version_at_least "$1" 1 8 0
+}
+
 validate_supported_version() {
   require_supported_version "$NOWHERE_VERSION"
 }
@@ -598,6 +623,14 @@ validate_telemetry_interval() {
   fi
 }
 
+validate_vector_mux() {
+  [[ "$1" == "0" || "$1" == "1" ]]
+}
+
+validate_quic_memory_profile() {
+  [[ "$1" == "memory" || "$1" == "balanced" || "$1" == "throughput" ]]
+}
+
 validate_socks() {
   local socks="$1"
   local endpoint userinfo host port
@@ -671,23 +704,37 @@ validate_config_values() {
   validate_telemetry_interval "$NOWHERE_TELEMETRY_INTERVAL" || die "NOWHERE_TELEMETRY_INTERVAL must be 250ms..60000ms or 1s..60s."
   [[ "$NOWHERE_LOG" == "none" || "$NOWHERE_LOG" == "debug" || "$NOWHERE_LOG" == "info" || "$NOWHERE_LOG" == "warn" || "$NOWHERE_LOG" == "error" || "$NOWHERE_LOG" == "event" ]] || die "Invalid log level: ${NOWHERE_LOG}"
   NOWHERE_CLIENT="$(normalize_client "$NOWHERE_CLIENT")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
+  validate_supported_version
+  if version_uses_mux "$NOWHERE_VERSION"; then
+    validate_quic_memory_profile "$NOWHERE_QUIC_MEMORY_PROFILE" || die "NOWHERE_QUIC_MEMORY_PROFILE must be memory, balanced, or throughput."
+  fi
   if [[ "$NOWHERE_CLIENT" != "anywhere" && "$NOWHERE_VECTOR_PIN" != "none" ]] && ! version_at_least "$NOWHERE_VERSION" 1 5 1; then
     die "NOWHERE_VECTOR_PIN requires Nowhere v1.5.1 or newer."
   fi
+  if ! version_uses_mux "$NOWHERE_VERSION"; then
+    if [[ "$NOWHERE_CLIENT" == "vector" ]]; then
+      [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 256 ]] || die "NOWHERE_POOL must be 0..256 for Native Vector."
+    else
+      [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 9 ]] || die "NOWHERE_POOL must be 0..9 when Anywhere links are enabled."
+    fi
+  fi
   if [[ "$NOWHERE_CLIENT" == "vector" ]]; then
-    [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 256 ]] || die "NOWHERE_POOL must be 0..256 for Native Vector."
     validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "NOWHERE_VECTOR_SOCKS must be [user:pass@]host:port or :port."
     [[ "$NOWHERE_VECTOR_SNI" == "none" || "$NOWHERE_VECTOR_SNI" =~ ^[A-Za-z0-9.-]+$ ]] || die "NOWHERE_VECTOR_SNI must be a DNS name or none."
     [[ "$NOWHERE_VECTOR_PIN" == "none" || "$NOWHERE_VECTOR_PIN" =~ ^[0-9a-f]{64}$ ]] || die "NOWHERE_VECTOR_PIN must be none or 64 lowercase hexadecimal characters."
+    if version_uses_mux "$NOWHERE_VERSION"; then
+      validate_vector_mux "$NOWHERE_VECTOR_MUX" || die "NOWHERE_VECTOR_MUX must be 0 or 1."
+    fi
   else
-    [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 9 ]] || die "NOWHERE_POOL must be 0..9 when Anywhere links are enabled."
     if [[ "$NOWHERE_CLIENT" == "both" ]]; then
       validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "NOWHERE_VECTOR_SOCKS must be [user:pass@]host:port or :port."
       [[ "$NOWHERE_VECTOR_SNI" == "none" || "$NOWHERE_VECTOR_SNI" =~ ^[A-Za-z0-9.-]+$ ]] || die "NOWHERE_VECTOR_SNI must be a DNS name or none."
       [[ "$NOWHERE_VECTOR_PIN" == "none" || "$NOWHERE_VECTOR_PIN" =~ ^[0-9a-f]{64}$ ]] || die "NOWHERE_VECTOR_PIN must be none or 64 lowercase hexadecimal characters."
+      if version_uses_mux "$NOWHERE_VERSION"; then
+        validate_vector_mux "$NOWHERE_VECTOR_MUX" || die "NOWHERE_VECTOR_MUX must be 0 or 1."
+      fi
     fi
   fi
-  validate_supported_version
   if [[ "$NOWHERE_TLS" == "2" ]]; then
     [[ -n "$NOWHERE_CRT" && -n "$NOWHERE_TLS_KEY" ]] || die "tls=2 requires --crt and --tls-key."
     [[ -f "$NOWHERE_CRT" ]] || die "Certificate file not found: ${NOWHERE_CRT}"
@@ -735,7 +782,7 @@ build_anywhere_client_query() {
   local query
   query="up=${up}&down=${down}"
 
-  if [[ "$up" == "tcp" && "$down" == "tcp" ]]; then
+  if ! version_uses_mux "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}" && [[ "$up" == "tcp" && "$down" == "tcp" ]]; then
     query="${query}&pool=${NOWHERE_POOL_VALUE:-$DEFAULT_POOL}"
   fi
   if [[ -n "${NOWHERE_ALPN_VALUE:-}" && "$NOWHERE_ALPN_VALUE" != "$DEFAULT_ALPN" ]]; then
@@ -750,8 +797,11 @@ build_vector_query() {
   local down="$2"
   local query="up=${up}&down=${down}"
 
-  if [[ "$up" == "tcp" && "$down" == "tcp" ]]; then
+  if ! version_uses_mux "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}" && [[ "$up" == "tcp" && "$down" == "tcp" ]]; then
     query="${query}&pool=${NOWHERE_POOL_VALUE:-$DEFAULT_POOL}"
+  fi
+  if version_uses_mux "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}"; then
+    query="${query}&mux=${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_VECTOR_MUX}"
   fi
   query="${query}&sni=$(urlencode "${NOWHERE_VECTOR_SNI_VALUE:-$DEFAULT_VECTOR_SNI}")"
   if version_at_least "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}" 1 5 1; then
@@ -805,6 +855,8 @@ configure_values() {
   NOWHERE_VECTOR_SOCKS="${NOWHERE_VECTOR_SOCKS:-${NOWHERE_VECTOR_SOCKS_VALUE:-$DEFAULT_VECTOR_SOCKS}}"
   NOWHERE_VECTOR_SNI="${NOWHERE_VECTOR_SNI:-${NOWHERE_VECTOR_SNI_VALUE:-}}"
   NOWHERE_VECTOR_PIN="${NOWHERE_VECTOR_PIN:-${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_VECTOR_PIN}}"
+  NOWHERE_VECTOR_MUX="${NOWHERE_VECTOR_MUX:-${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_VECTOR_MUX}}"
+  NOWHERE_QUIC_MEMORY_PROFILE="${NOWHERE_QUIC_MEMORY_PROFILE:-${NOWHERE_QUIC_MEMORY_PROFILE_VALUE:-${NOW_QUIC_MEMORY_PROFILE:-$DEFAULT_QUIC_MEMORY_PROFILE}}}"
   NOWHERE_PUBLIC_HOST="${NOWHERE_PUBLIC_HOST:-${NOWHERE_PUBLIC_HOST_VALUE:-$detected_host}}"
   NOWHERE_LISTEN_HOST="${NOWHERE_LISTEN_HOST:-${NOWHERE_LISTEN_HOST_VALUE:-}}"
   NOWHERE_CRT="${NOWHERE_CRT:-${NOWHERE_CRT_VALUE:-}}"
@@ -835,8 +887,13 @@ configure_values() {
     NOWHERE_SOCKS="$(read_value "SOCKS5 出站代理，none/host:port/user:pass@host:port" "$NOWHERE_SOCKS")"
     NOWHERE_LOG="$(read_value "日志级别 none/debug/info/warn/error/event" "$NOWHERE_LOG")"
     NOWHERE_TELEMETRY_INTERVAL="$(read_value "TUI 遥测刷新间隔 250ms..60s" "$NOWHERE_TELEMETRY_INTERVAL")"
+    if version_uses_mux "$NOWHERE_VERSION"; then
+      NOWHERE_QUIC_MEMORY_PROFILE="$(read_value "QUIC 内存策略 memory/balanced/throughput" "$NOWHERE_QUIC_MEMORY_PROFILE")"
+    fi
     if [[ "$NOWHERE_CLIENT" == "vector" || "$NOWHERE_CLIENT" == "both" ]]; then
-      if [[ "$NOWHERE_CLIENT" == "both" ]]; then
+      if version_uses_mux "$NOWHERE_VERSION"; then
+        NOWHERE_VECTOR_MUX="$(read_value "Vector TLS Mux 0=专用连接，1=共享 Mux" "$NOWHERE_VECTOR_MUX")"
+      elif [[ "$NOWHERE_CLIENT" == "both" ]]; then
         NOWHERE_POOL="$(read_value "TCP pool（Anywhere 限制为 0..9）" "$NOWHERE_POOL")"
       else
         NOWHERE_POOL="$(read_value "Native Vector TCP pool，0..256" "$NOWHERE_POOL")"
@@ -847,7 +904,7 @@ configure_values() {
       fi
       NOWHERE_VECTOR_SNI="$(read_value "Vector SNI，none 表示不校验证书" "$NOWHERE_VECTOR_SNI")"
       NOWHERE_VECTOR_PIN="$(read_value "Vector 证书 SHA-256 pin，none 表示不固定证书" "$NOWHERE_VECTOR_PIN")"
-    else
+    elif ! version_uses_mux "$NOWHERE_VERSION"; then
       NOWHERE_POOL="$(read_value "Anywhere TCP pool，0..9" "$NOWHERE_POOL")"
     fi
   fi
@@ -886,11 +943,18 @@ NOWHERE_SOCKS_VALUE=$(env_quote "$NOWHERE_SOCKS")
 NOWHERE_LOG_VALUE=$(env_quote "$NOWHERE_LOG")
 NOWHERE_TELEMETRY_INTERVAL_VALUE=$(env_quote "$NOWHERE_TELEMETRY_INTERVAL")
 NOW_TELEMETRY_INTERVAL=$(env_quote "$NOWHERE_TELEMETRY_INTERVAL")
-NOWHERE_POOL_VALUE=$(env_quote "$NOWHERE_POOL")
 NOWHERE_VECTOR_SOCKS_VALUE=$(env_quote "$NOWHERE_VECTOR_SOCKS")
 NOWHERE_VECTOR_SNI_VALUE=$(env_quote "$NOWHERE_VECTOR_SNI")
 NOWHERE_VECTOR_PIN_VALUE=$(env_quote "$NOWHERE_VECTOR_PIN")
+NOWHERE_VECTOR_MUX_VALUE=$(env_quote "$NOWHERE_VECTOR_MUX")
 EOF
+  if version_uses_mux "$NOWHERE_VERSION"; then
+    printf 'NOWHERE_QUIC_MEMORY_PROFILE_VALUE=%s\n' "$(env_quote "$NOWHERE_QUIC_MEMORY_PROFILE")" >>"$CONFIG_FILE"
+    printf 'NOW_QUIC_MEMORY_PROFILE=%s\n' "$(env_quote "$NOWHERE_QUIC_MEMORY_PROFILE")" >>"$CONFIG_FILE"
+  fi
+  if ! version_uses_mux "$NOWHERE_VERSION"; then
+    printf 'NOWHERE_POOL_VALUE=%s\n' "$(env_quote "$NOWHERE_POOL")" >>"$CONFIG_FILE"
+  fi
   chmod 600 "$CONFIG_FILE"
   info "Config saved to ${CONFIG_FILE}"
 }
@@ -915,7 +979,7 @@ install_binary() {
 
   local version="${1:-${NOWHERE_VERSION:-}}"
   local asset url tmpdir binary
-  validate_release_version "$version" || die "An exact release version such as v1.6.0 is required."
+  validate_release_version "$version" || die "An exact release version such as v1.8.0 is required."
   asset="$(detect_asset)"
   url="https://github.com/${REPO}/releases/download/${version}/${asset}"
   tmpdir="$(mktemp -d)"

@@ -21,12 +21,14 @@ Linux VPS 一键部署和管理脚本。
 ## 兼容性
 
 本脚本支持 Nowhere v1.5 及以后版本，**Anywhere 2.0 已支持该协议**。
-Nowhere v1.6 增加本地遥测和 TUI，但没有修改 v1 线协议。
+默认安装 Nowhere v1.8.0；该版本移除了旧 TCP `pool`，改为 Native Vector
+可选的 TLS Mux（`mux=0|1`）。
 
 | Portal 版本 | 客户端 | 链接 | 说明 |
 | --- | --- | --- | --- |
-| v1.5+ | Anywhere 2.0 | `nowhere://...` | pool 为 `0..9` |
-| v1.5+ | Native Vector | `vector://...` | 本地 SOCKS5 客户端，pool 为 `0..256` |
+| v1.8+ | Anywhere 2.0 | `nowhere://...` | 不含 `pool` 参数 |
+| v1.8+ | Native Vector | `vector://...` | 本地 SOCKS5 客户端，支持 `mux=0|1` |
+| v1.5-v1.7 | Anywhere 2.0 / Native Vector | 对应链接 | 指定旧 Release 时保留旧 `pool` |
 
 同一个 v1.5+ Portal 可以根据需要输出 Anywhere 2.0 或 Native Vector 的客户端配置；
 脚本不再提供 v1.5 以前版本。
@@ -41,7 +43,7 @@ chmod +x nowhere-vps.sh
 sudo bash nowhere-vps.sh
 ```
 
-默认入口会安装 Nowhere v1.6.0，并输出 Anywhere 2.0 链接：
+默认入口会安装 Nowhere v1.8.0，并输出 Anywhere 2.0 链接：
 
 ```text
 1) 安装/重装（Anywhere）
@@ -77,7 +79,7 @@ Native Vector 使用 `install-vector`。
 
 ```bash
 sudo bash nowhere-vps.sh update
-sudo bash nowhere-vps.sh update --version v1.6.0
+sudo bash nowhere-vps.sh update --version v1.8.0
 ```
 
 菜单 `5` 是完整的指定版本安装/切换，会进入配置向导。
@@ -108,7 +110,13 @@ Portal 仍由 systemd 在后台运行；按 `q` 退出面板不会停止或修�
 
 - `anywhere`：输出 Anywhere 2.0 使用的 `nowhere://` 链接。
 - `vector`：输出 `vector://` URL 和原生客户端命令。
-- `both`：两种都输出；为了兼容 Anywhere，TCP pool 限制为 `0..9`。
+- `both`：两种都输出。
+
+Native Vector 使用 v1.8+ 时，向导会额外询问 TLS Mux：保留 `0` 为每条流使用
+独立 TLS 连接，选择 `1` 则使用共享 TLS Mux Shard。此设置不影响 Anywhere 链接。
+
+v1.8+ Portal 还可选择 QUIC 内存策略：默认 `balanced`；`memory` 偏向连接密度，
+`throughput` 会提高高带宽、高延迟链路的流控窗口。
 
 Anywhere 2.0 示例：
 
@@ -165,17 +173,19 @@ sudo bash nowhere-vps.sh uninstall
 
 | 环境变量 | 命令行参数 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `NOWHERE_VERSION` | `--version` | `v1.6.0` | 指定 Release |
+| `NOWHERE_VERSION` | `--version` | `v1.8.0` | 指定 Release |
 | `NOWHERE_CLIENT` | `--client` | `anywhere` | `anywhere`、`vector` 或 `both` |
 | `NOWHERE_PUBLIC_HOST` | `--public-host` | 自动探测 | 公网域名或 IP |
 | `NOWHERE_PORT` | `--port` | `2077` | Portal 端口 |
 | `NOWHERE_KEY` | `--key` | 随机 | Shared key |
 | `NOWHERE_NET` | `--net` | `mix` | `mix`、`tcp` 或 `udp` |
 | `NOWHERE_TLS` | `--tls` | `1` | `1` 自签，`2` PEM |
-| `NOWHERE_POOL` | `--pool` | `5` | Anywhere `0..9`，Vector `0..256` |
+| `NOWHERE_POOL` | `--pool` | `5` | 仅 v1.5-v1.7 的旧 TCP pool |
 | `NOWHERE_VECTOR_SOCKS` | `--vector-socks` | `127.0.0.1:1080` | Vector 本地 SOCKS5 入口 |
 | `NOWHERE_VECTOR_SNI` | `--sni` | `none` | Vector TLS 校验名称 |
 | `NOWHERE_VECTOR_PIN` | `--pin` | `none` | v1.5.1+ 小写证书 SHA-256 pin |
+| `NOWHERE_VECTOR_MUX` | `--mux` | `0` | v1.8+ Vector TLS：`0` 独立连接，`1` 共享 Mux |
+| `NOWHERE_QUIC_MEMORY_PROFILE` | `--quic-memory-profile` | `balanced` | v1.8+ Portal QUIC：`memory`、`balanced` 或 `throughput` |
 | `NOWHERE_TELEMETRY_INTERVAL` / `NOW_TELEMETRY_INTERVAL` | `--telemetry-interval` | `1s` | v1.6+ TUI 快照间隔，`250ms..60s` |
 
 完整参数请运行：
