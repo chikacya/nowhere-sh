@@ -8,160 +8,69 @@ CONFIG_DIR="/etc/nowhere"
 CONFIG_FILE="${CONFIG_DIR}/nowhere.env"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
+DEFAULT_VERSION="v2.0.0"
 DEFAULT_PORT="2077"
-DEFAULT_NET="mix"
-DEFAULT_ALPN="now/1"
-DEFAULT_LOG="info"
-DEFAULT_POOL="5"
-DEFAULT_VECTOR_MUX="0"
-DEFAULT_QUIC_MEMORY_PROFILE="balanced"
-DEFAULT_TRANSPORT_MEMORY_PROFILE="throughput"
-DEFAULT_MORPH="0"
-DEFAULT_MIX_FALLBACK_TIMEOUT="none"
-DEFAULT_SOCKS="none"
+DEFAULT_TCP_CARRIER="tcp"
+DEFAULT_UDP_CARRIER="udp"
 DEFAULT_CLIENT="anywhere"
-DEFAULT_MODERN_VERSION="v1.8.3"
-DEFAULT_VECTOR_VERSION="$DEFAULT_MODERN_VERSION"
-DEFAULT_V2_VERSION="v2.0.0"
-DEFAULT_TELEMETRY_INTERVAL="1s"
+DEFAULT_TLS="1"
+DEFAULT_LOG="info"
+DEFAULT_MORPH="0"
+DEFAULT_MUX="0"
+DEFAULT_TRANSPORT_MEMORY_PROFILE="throughput"
+DEFAULT_MIX_FALLBACK_TIMEOUT="1s"
+DEFAULT_SOCKS="none"
 DEFAULT_VECTOR_SOCKS="127.0.0.1:1080"
-DEFAULT_VECTOR_SNI="none"
-DEFAULT_VECTOR_PIN="none"
+DEFAULT_SNI="none"
+DEFAULT_PIN="none"
+DEFAULT_TELEMETRY_INTERVAL="1s"
 
 ASSUME_YES=0
 VERSION_EXPLICIT=0
 ACTION="${1:-menu}"
-if [[ $# -gt 0 ]]; then
-  shift
-fi
+[[ $# -eq 0 ]] || shift
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -y|--yes)
-      ASSUME_YES=1
-      shift
-      ;;
-    --port)
-      NOWHERE_PORT="${2:?missing --port value}"
-      shift 2
-      ;;
-    --tcp-port)
-      NOWHERE_TCP_PORT="${2:?missing --tcp-port value}"
-      shift 2
-      ;;
-    --udp-port)
-      NOWHERE_UDP_PORT="${2:?missing --udp-port value}"
-      shift 2
-      ;;
-    --key)
-      NOWHERE_KEY="${2:?missing --key value}"
-      shift 2
-      ;;
-    --client)
-      NOWHERE_CLIENT="${2:?missing --client value}"
-      shift 2
-      ;;
-    --version)
-      NOWHERE_VERSION="${2:?missing --version value}"
-      VERSION_EXPLICIT=1
-      shift 2
-      ;;
-    --net)
-      NOWHERE_NET="${2:?missing --net value}"
-      shift 2
-      ;;
-    --tls)
-      NOWHERE_TLS="${2:?missing --tls value}"
-      shift 2
-      ;;
-    --crt|--cert)
-      NOWHERE_CRT="${2:?missing --crt value}"
-      shift 2
-      ;;
-    --tls-key)
-      NOWHERE_TLS_KEY="${2:?missing --tls-key value}"
-      shift 2
-      ;;
-    --public-host)
-      NOWHERE_PUBLIC_HOST="${2:?missing --public-host value}"
-      shift 2
-      ;;
-    --listen-host)
-      NOWHERE_LISTEN_HOST="${2:?missing --listen-host value}"
-      shift 2
-      ;;
-    --alpn)
-      NOWHERE_ALPN="${2:?missing --alpn value}"
-      shift 2
-      ;;
-    --rate)
-      NOWHERE_RATE="${2:?missing --rate value}"
-      shift 2
-      ;;
-    --etar)
-      NOWHERE_ETAR="${2:?missing --etar value}"
-      shift 2
-      ;;
-    --dial)
-      NOWHERE_DIAL="${2:?missing --dial value}"
-      shift 2
-      ;;
-    --socks)
-      NOWHERE_SOCKS="${2:?missing --socks value}"
-      shift 2
-      ;;
-    --log)
-      NOWHERE_LOG="${2:?missing --log value}"
-      shift 2
-      ;;
-    --pool)
-      NOWHERE_POOL="${2:?missing --pool value}"
-      shift 2
-      ;;
-    --vector-socks)
-      NOWHERE_VECTOR_SOCKS="${2:?missing --vector-socks value}"
-      shift 2
-      ;;
-    --sni)
-      NOWHERE_VECTOR_SNI="${2:?missing --sni value}"
-      shift 2
-      ;;
-    --pin)
-      NOWHERE_VECTOR_PIN="${2:?missing --pin value}"
-      shift 2
-      ;;
-    --mux)
-      NOWHERE_VECTOR_MUX="${2:?missing --mux value}"
-      shift 2
-      ;;
-    --quic-memory-profile)
-      NOWHERE_QUIC_MEMORY_PROFILE="${2:?missing --quic-memory-profile value}"
-      shift 2
-      ;;
-    --transport-memory-profile)
-      NOWHERE_TRANSPORT_MEMORY_PROFILE="${2:?missing --transport-memory-profile value}"
-      shift 2
-      ;;
-    --morph)
-      NOWHERE_MORPH="${2:?missing --morph value}"
-      shift 2
-      ;;
-    --mix-fallback-timeout)
-      NOWHERE_MIX_FALLBACK_TIMEOUT="${2:?missing --mix-fallback-timeout value}"
-      shift 2
-      ;;
-    --telemetry-interval)
-      NOWHERE_TELEMETRY_INTERVAL="${2:?missing --telemetry-interval value}"
-      shift 2
-      ;;
-    -h|--help)
-      ACTION="help"
-      shift
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      exit 1
-      ;;
+    -y|--yes) ASSUME_YES=1; shift ;;
+    --version) NOWHERE_VERSION="${2:?missing --version value}"; VERSION_EXPLICIT=1; shift 2 ;;
+    --client) NOWHERE_CLIENT="${2:?missing --client value}"; shift 2 ;;
+    --key) NOWHERE_KEY="${2:?missing --key value}"; shift 2 ;;
+    --public-host) NOWHERE_PUBLIC_HOST="${2:?missing --public-host value}"; shift 2 ;;
+    --listen-host) NOWHERE_LISTEN_HOST="${2:?missing --listen-host value}"; shift 2 ;;
+    --tcp-carrier) NOWHERE_TCP_CARRIER="${2:?missing --tcp-carrier value}"; shift 2 ;;
+    --tcp-port) NOWHERE_TCP_PORT="${2:?missing --tcp-port value}"; shift 2 ;;
+    --udp-carrier) NOWHERE_UDP_CARRIER="${2:?missing --udp-carrier value}"; shift 2 ;;
+    --udp-port) NOWHERE_UDP_PORT="${2:?missing --udp-port value}"; shift 2 ;;
+    --tls) NOWHERE_TLS="${2:?missing --tls value}"; shift 2 ;;
+    --crt|--cert) NOWHERE_CRT="${2:?missing --crt value}"; shift 2 ;;
+    --tls-key) NOWHERE_TLS_KEY="${2:?missing --tls-key value}"; shift 2 ;;
+    --morph) NOWHERE_MORPH="${2:?missing --morph value}"; shift 2 ;;
+    --rate) NOWHERE_RATE="${2:?missing --rate value}"; shift 2 ;;
+    --etar) NOWHERE_ETAR="${2:?missing --etar value}"; shift 2 ;;
+    --dial) NOWHERE_DIAL="${2:?missing --dial value}"; shift 2 ;;
+    --socks) NOWHERE_SOCKS="${2:?missing --socks value}"; shift 2 ;;
+    --next) NOWHERE_NEXT="${2:?missing --next value}"; shift 2 ;;
+    --next-up) NOWHERE_NEXT_UP="${2:?missing --next-up value}"; shift 2 ;;
+    --next-down) NOWHERE_NEXT_DOWN="${2:?missing --next-down value}"; shift 2 ;;
+    --next-mux) NOWHERE_NEXT_MUX="${2:?missing --next-mux value}"; shift 2 ;;
+    --next-sni) NOWHERE_NEXT_SNI="${2:?missing --next-sni value}"; shift 2 ;;
+    --next-pin) NOWHERE_NEXT_PIN="${2:?missing --next-pin value}"; shift 2 ;;
+    --vector-up) NOWHERE_VECTOR_UP="${2:?missing --vector-up value}"; shift 2 ;;
+    --vector-down) NOWHERE_VECTOR_DOWN="${2:?missing --vector-down value}"; shift 2 ;;
+    --mux) NOWHERE_VECTOR_MUX="${2:?missing --mux value}"; shift 2 ;;
+    --vector-socks) NOWHERE_VECTOR_SOCKS="${2:?missing --vector-socks value}"; shift 2 ;;
+    --vector-rate) NOWHERE_VECTOR_RATE="${2:?missing --vector-rate value}"; shift 2 ;;
+    --vector-etar) NOWHERE_VECTOR_ETAR="${2:?missing --vector-etar value}"; shift 2 ;;
+    --vector-log) NOWHERE_VECTOR_LOG="${2:?missing --vector-log value}"; shift 2 ;;
+    --sni) NOWHERE_VECTOR_SNI="${2:?missing --sni value}"; shift 2 ;;
+    --pin) NOWHERE_VECTOR_PIN="${2:?missing --pin value}"; shift 2 ;;
+    --log) NOWHERE_LOG="${2:?missing --log value}"; shift 2 ;;
+    --transport-memory-profile) NOWHERE_TRANSPORT_MEMORY_PROFILE="${2:?missing --transport-memory-profile value}"; shift 2 ;;
+    --mix-fallback-timeout) NOWHERE_MIX_FALLBACK_TIMEOUT="${2:?missing --mix-fallback-timeout value}"; shift 2 ;;
+    --telemetry-interval) NOWHERE_TELEMETRY_INTERVAL="${2:?missing --telemetry-interval value}"; shift 2 ;;
+    -h|--help) ACTION="help"; shift ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
   esac
 done
 
@@ -171,101 +80,52 @@ die() { printf '\033[1;31m[Error]\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-Nowhere VPS 一键部署脚本。
+Nowhere VPS deployment and management script.
 
 Usage:
   sudo bash nowhere-vps.sh
-  sudo bash nowhere-vps.sh install|install-anywhere [--yes] [options]
-  sudo bash nowhere-vps.sh install-v2 [--yes] [options]
-  sudo bash nowhere-vps.sh upgrade-v1-to-v2 [--yes] [options]
+  sudo bash nowhere-vps.sh install [--yes] [options]
   sudo bash nowhere-vps.sh install-vector [--yes] [options]
   sudo bash nowhere-vps.sh configure [options]
-  sudo bash nowhere-vps.sh update [--version v1.8.3]
+  sudo bash nowhere-vps.sh update [--version v2.0.0]
   sudo bash nowhere-vps.sh versions
-  sudo bash nowhere-vps.sh start|stop|restart|status|tui|logs|link
-  sudo bash nowhere-vps.sh fingerprint
-  sudo bash nowhere-vps.sh uninstall
+  sudo bash nowhere-vps.sh start|stop|restart|status|tui|logs|link|fingerprint|uninstall
 
-No arguments opens the interactive menu. Press Enter in the installer wizard to
-keep every default value.
+This script supports Nowhere releases v2.0.0 and later. Press Enter in the wizard to keep defaults.
 
 Options:
-  --client anywhere|vector|both  Client links to print for v1.5+
-  --version v1.8.3         Exact GitHub Release version to install
-  --port 2077              Portal listen port
-  --tcp-port 2077          V2 TCP carrier port; empty disables TCP
-  --udp-port 2077          V2 UDP carrier port; empty disables UDP
-  --key secret             Shared key
-  --net mix|tcp|udp        Server listener transport
-  --tls 1|2                1=self-signed, 2=PEM certificate
-  --crt /path/cert.pem     PEM certificate chain for tls=2
-  --tls-key /path/key.pem  PEM private key for tls=2
-  --public-host host       Domain/IP used in generated client URLs
-  --listen-host host       Bind host; empty means IPv4 and IPv6 wildcard
-  --alpn now/1             TLS/QUIC ALPN
-  --rate 0                 Client-to-target limit in Mbps, 0 disables
-  --etar 0                 Target-to-client limit in Mbps, 0 disables
-  --dial auto              Outbound source IP or auto
-  --socks none             SOCKS5 outbound proxy: host:port or user:pass@host:port
-  --log info               none|debug|info|warn|error|event
-  --pool 5                 TCP pool for v1.5-v1.7 only
-  --vector-socks addr      Native Vector local SOCKS5 listener
-  --sni name|none          Native Vector certificate verification name
-  --pin sha256|none        Native Vector lowercase leaf certificate SHA-256 pin
-  --mux 0|1                Native Vector TLS: 0=dedicated, 1=shared Mux (v1.8+)
-  --quic-memory-profile p  Portal QUIC: memory|balanced|throughput (v1.8+)
-  --transport-memory-profile p  V2 transport: memory|balanced|throughput
-  --morph 0|1              V2 ChaCha20 wire transform; both peers must match
-  --mix-fallback-timeout t V2 mix fallback timeout, or none to omit it
-  --telemetry-interval 1s  TUI snapshot interval for v1.6+ (250ms..60s)
-
-Environment variables with the same names are also supported, for example:
-  NOWHERE_PORT=443 NOWHERE_NET=mix sudo -E bash nowhere-vps.sh install-anywhere --yes
+  --client anywhere|vector|both
+  --version v2.0.0
+  --key secret
+  --public-host host              Client-facing domain or IP
+  --listen-host host              Portal bind host; empty binds wildcard addresses
+  --tcp-carrier tcp|tcp4|tcp6|none
+  --tcp-port 2077
+  --udp-carrier udp|udp4|udp6|none
+  --udp-port 2077
+  --tls 1|2                       1=self-signed, 2=PEM certificate
+  --crt /absolute/certificate.pem --tls-key /absolute/private.key
+  --morph 0|1
+  --rate 0 --etar 0 --dial auto --log info
+  --socks none|[user:pass@]host:port
+  --next key@host:port            Native Portal upstream; mutually exclusive with socks
+  --next-up tcp|udp|mix --next-down tcp|udp|mix --next-mux 0|1
+  --next-sni name|none --next-pin sha256|none
+  --vector-up tcp|udp|mix --vector-down tcp|udp|mix --mux 0|1
+  --vector-socks 127.0.0.1:1080 --vector-rate 0 --vector-etar 0 --vector-log info
+  --sni name|none --pin sha256|none
+  --transport-memory-profile memory|balanced|throughput
+  --mix-fallback-timeout 1s
+  --telemetry-interval 1s
 EOF
 }
 
-require_root() {
-  [[ "$(id -u)" -eq 0 ]] || die "请使用 root 运行，例如：sudo bash $0 ${ACTION}"
-}
-
+require_root() { [[ "$(id -u)" -eq 0 ]] || die "Please run as root: sudo bash $0 ${ACTION}"; }
 require_systemd() {
-  command -v systemctl >/dev/null 2>&1 || die "当前系统缺少 systemctl，暂不支持此 VPS。"
-  [[ -d /run/systemd/system ]] || warn "systemd 看起来未运行，服务管理命令可能失败。"
+  command -v systemctl >/dev/null 2>&1 || die "systemctl is required."
+  [[ -d /run/systemd/system ]] || warn "systemd does not appear to be running; service commands may fail."
 }
-
-install_qrencode() {
-  command -v qrencode >/dev/null 2>&1 && return 0
-
-  info "Installing qrencode for terminal QR output..."
-  if command -v apt-get >/dev/null 2>&1; then
-    DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qrencode
-  elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y qrencode
-  elif command -v yum >/dev/null 2>&1; then
-    yum install -y qrencode
-  elif command -v apk >/dev/null 2>&1; then
-    apk add --no-cache qrencode
-  else
-    warn "qrencode is not installed and no supported package manager was found."
-    return 1
-  fi
-
-  command -v qrencode >/dev/null 2>&1 || {
-    warn "Could not install qrencode; QR code output was skipped."
-    return 1
-  }
-}
-
-print_qr_code() {
-  local link="$1" label="$2"
-  [[ -n "$link" ]] || return 0
-
-  install_qrencode || return 0
-  echo
-  echo "QR code (${label}):"
-  qrencode -t ANSIUTF8 -m 1 -s 1 "$link" || warn "Could not render the QR code."
-}
+load_config() { [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE" || true; }
 
 env_quote() {
   local value="${1//$'\n'/}"
@@ -273,7 +133,6 @@ env_quote() {
   value="${value//\"/\\\"}"
   printf '"%s"' "$value"
 }
-
 urlencode() {
   local input="${1:-}"
   if command -v python3 >/dev/null 2>&1; then
@@ -283,897 +142,275 @@ urlencode() {
   elif [[ "$input" =~ ^[A-Za-z0-9._~-]*$ ]]; then
     printf '%s\n' "$input"
   else
-    die "python3 is required to percent-encode values containing reserved URL characters."
+    die "python3 is required to percent-encode this value."
   fi
 }
-
 format_host_for_url() {
   local host="${1:-}"
-  if [[ -z "$host" ]]; then
-    printf ''
-  elif [[ "$host" == \[*\] ]]; then
-    printf '%s' "$host"
-  elif [[ "$host" == *:* ]]; then
-    printf '[%s]' "$host"
-  else
-    printf '%s' "$host"
-  fi
-}
-
-display_socks() {
-  local socks="${1:-none}"
-  if [[ -z "$socks" || "$socks" == "none" ]]; then
-    printf 'none'
-  elif [[ "$socks" == *@* ]]; then
-    printf '***@%s' "${socks##*@}"
-  else
-    printf '%s' "$socks"
-  fi
-}
-
-strip_brackets() {
-  local host="${1:-}"
-  host="${host#[}"
-  host="${host%]}"
+  [[ -z "$host" ]] && return
+  [[ "$host" == \[*\] ]] && { printf '%s' "$host"; return; }
+  [[ "$host" == *:* ]] && { printf '[%s]' "$host"; return; }
   printf '%s' "$host"
 }
-
-display_empty() {
-  local value="${1:-}"
-  local fallback="${2:-<空>}"
-  if [[ -z "$value" ]]; then
-    printf '%s' "$fallback"
-  else
-    printf '%s' "$value"
-  fi
-}
-
-local_tls_probe_host() {
-  local host="${NOWHERE_LISTEN_HOST_VALUE:-}"
-  if [[ -z "$host" || "$host" == "0.0.0.0" || "$host" == "::" || "$host" == "[::]" ]]; then
-    printf '127.0.0.1'
-  else
-    strip_brackets "$host"
-  fi
-}
-
-print_tls_fingerprint_from_tcp() {
-  command -v openssl >/dev/null 2>&1 || return 1
-  command -v timeout >/dev/null 2>&1 || return 1
-  local probe_port
-  if version_is_v2 "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}"; then
-    probe_port="${NOWHERE_TCP_PORT_VALUE:-}"
-  else
-    [[ "${NOWHERE_NET_VALUE:-mix}" != "udp" ]] || return 1
-    probe_port="${NOWHERE_PORT_VALUE:-}"
-  fi
-  [[ -n "$probe_port" ]] || return 1
-
-  local connect_host sni output fingerprint
-  connect_host="$(local_tls_probe_host)"
-  sni="${NOWHERE_PUBLIC_HOST_VALUE:-localhost}"
-  for _ in 1 2 3 4 5; do
-    output="$(
-      timeout 8 openssl s_client \
-        -connect "${connect_host}:${probe_port}" \
-        -servername "$sni" \
-        -showcerts </dev/null 2>/dev/null |
-        openssl x509 -noout -fingerprint -sha256 2>/dev/null || true
-    )"
-    fingerprint="${output#*=}"
-    if [[ -n "$fingerprint" && "$fingerprint" != "$output" ]]; then
-      printf '%s\n' "$fingerprint"
-      return 0
-    fi
-    sleep 1
-  done
-  return 1
-}
-
-print_tls_fingerprint_from_logs() {
-  command -v journalctl >/dev/null 2>&1 || return 1
-  local line fingerprint
-
-  line="$(
-    journalctl -u "$SERVICE_NAME" -n 300 --no-pager 2>/dev/null |
-      grep -Eai 'CERT_SHA256\|' |
-      tail -n 1 || true
-  )"
-  if [[ -n "$line" ]]; then
-    fingerprint="$(
-      printf '%s\n' "$line" |
-        sed -nE 's/.*CERT_SHA256\|([A-Fa-f0-9]{64}).*/\1/p' |
-        tail -n 1
-    )"
-    [[ -n "$fingerprint" ]] && {
-      printf '%s\n' "$fingerprint"
-      return 0
-    }
-  fi
-
-  line="$(
-    journalctl -u "$SERVICE_NAME" -n 300 --no-pager 2>/dev/null |
-      grep -Eai 'fingerprint|sha-?256' |
-      tail -n 1 || true
-  )"
-  [[ -n "$line" ]] || return 1
-  fingerprint="$(
-    printf '%s\n' "$line" |
-      grep -Eaio '([A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2}|[A-Fa-f0-9]{64}' |
-      tail -n 1 || true
-  )"
-  [[ -n "$fingerprint" ]] || {
-    printf '%s\n' "$line"
-    return 0
-  }
-  printf '%s\n' "$fingerprint"
-}
-
-print_tls_fingerprint() {
-  require_root
-  load_config
-  if [[ "${NOWHERE_TLS_VALUE:-1}" != "1" ]]; then
-    echo
-    echo "当前配置不是 tls=1 自签模式，无需使用自签证书 fingerprint。"
-    echo "tls=2 请使用系统证书链校验，或在证书变更后按客户端需要重新固定证书。"
-    return 0
-  fi
-
-  echo
-  echo "当前 tls=1 自签证书 SHA-256 fingerprint："
-  local fingerprint
-  if fingerprint="$(print_tls_fingerprint_from_logs)"; then
-    echo "  ${fingerprint}"
-    echo
-    echo "提示：tls=1 证书存在内存中，Nowhere 每次重启后 fingerprint 都会变化。"
-    return 0
-  fi
-  if fingerprint="$(print_tls_fingerprint_from_tcp)"; then
-    echo "  ${fingerprint}"
-    echo
-    echo "提示：tls=1 证书存在内存中，Nowhere 每次重启后 fingerprint 都会变化。"
-    return 0
-  fi
-
-  warn "暂时没有获取到 fingerprint。请确认服务已启动，并且 net 不是 udp-only；也可以查看：journalctl -u ${SERVICE_NAME} -n 100"
-}
-
-mask_secret() {
-  local value="${1:-}"
-  local length="${#value}"
-  if [[ "$length" -le 8 ]]; then
-    printf '***'
-  else
-    printf '%s...%s' "${value:0:4}" "${value: -4}"
-  fi
-}
-
-confirm_default_yes() {
-  local prompt="$1"
-  local answer
-  if [[ "$ASSUME_YES" -eq 1 ]]; then
-    return 0
-  fi
-  read -r -p "${prompt} [Y/n]: " answer
-  [[ -z "$answer" || "$answer" == "y" || "$answer" == "Y" || "$answer" == "yes" || "$answer" == "YES" ]]
-}
-
-print_config_summary() {
-  echo
-  echo "配置确认："
-  echo "  客户端输出:        $(client_label "${NOWHERE_CLIENT:-anywhere}")"
-  echo "  Release:           ${NOWHERE_VERSION:-}"
-  echo "  公网域名/IP:       $(display_empty "${NOWHERE_PUBLIC_HOST:-}" "<自动探测失败，稍后可重新配置>")"
-  echo "  监听地址:          $(display_empty "${NOWHERE_LISTEN_HOST:-}" "<空，IPv4/IPv6 wildcard>")"
-  if version_is_v2 "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}"; then
-    echo "  V2 TCP / UDP 端口: ${NOWHERE_TCP_PORT:-<关闭>} / ${NOWHERE_UDP_PORT:-<关闭>}"
-    echo "  V2 Morph:          ${NOWHERE_MORPH:-$DEFAULT_MORPH}"
-    echo "  V2 传输内存策略:    ${NOWHERE_TRANSPORT_MEMORY_PROFILE:-$DEFAULT_TRANSPORT_MEMORY_PROFILE}"
-    echo "  V2 mix 回退延迟:    ${NOWHERE_MIX_FALLBACK_TIMEOUT:-$DEFAULT_MIX_FALLBACK_TIMEOUT}"
-  else
-    echo "  监听端口:          ${NOWHERE_PORT:-}"
-  fi
-  echo "  Shared Key:        $(mask_secret "${NOWHERE_KEY:-}")"
-  if ! version_is_v2 "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}"; then
-    echo "  Net:               ${NOWHERE_NET:-}"
-  fi
-  echo "  TLS:               ${NOWHERE_TLS:-}"
-  if [[ "${NOWHERE_TLS:-}" == "2" ]]; then
-    echo "  证书链:            ${NOWHERE_CRT:-}"
-    echo "  私钥:              ${NOWHERE_TLS_KEY:-}"
-  fi
-  if ! version_is_v2 "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}"; then
-    echo "  ALPN:              ${NOWHERE_ALPN:-}"
-  fi
-  echo "  Rate / Etar:       ${NOWHERE_RATE:-0} / ${NOWHERE_ETAR:-0} Mbps"
-  echo "  Dial:              ${NOWHERE_DIAL:-auto}"
-  echo "  SOCKS5 出站:       $(display_socks "${NOWHERE_SOCKS:-none}")"
-  echo "  Log:               ${NOWHERE_LOG:-}"
-  echo "  TUI 遥测间隔:      ${NOWHERE_TELEMETRY_INTERVAL:-$DEFAULT_TELEMETRY_INTERVAL}"
-  if version_uses_mux "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}"; then
-    echo "  QUIC 内存策略:      ${NOWHERE_QUIC_MEMORY_PROFILE:-$DEFAULT_QUIC_MEMORY_PROFILE}"
-  fi
-  if version_is_v2 "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}" || version_uses_mux "${NOWHERE_VERSION:-$DEFAULT_MODERN_VERSION}"; then
-    if [[ "${NOWHERE_CLIENT:-anywhere}" == "vector" || "${NOWHERE_CLIENT:-anywhere}" == "both" ]]; then
-      echo "  Vector TLS Mux:    ${NOWHERE_VECTOR_MUX:-$DEFAULT_VECTOR_MUX}"
-    fi
-  else
-    echo "  TCP Pool:          ${NOWHERE_POOL:-}"
-  fi
-  if [[ "${NOWHERE_CLIENT:-anywhere}" == "vector" || "${NOWHERE_CLIENT:-anywhere}" == "both" ]]; then
-    echo "  Vector SOCKS5:     ${NOWHERE_VECTOR_SOCKS:-}"
-    echo "  Vector SNI:        ${NOWHERE_VECTOR_SNI:-none}"
-    echo "  Vector Pin:        ${NOWHERE_VECTOR_PIN:-none}"
-  fi
-}
-
-random_token() {
-  local bytes="${1:-24}"
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -base64 "$bytes" | tr '+/' '-_' | tr -d '='
-  else
-    LC_ALL=C tr -dc 'A-Za-z0-9._~-' </dev/urandom | head -c $((bytes * 2))
-    printf '\n'
-  fi
-}
-
+strip_brackets() { local host="${1:-}"; host="${host#[}"; printf '%s' "${host%]}"; }
+random_token() { openssl rand -base64 24 | tr '+/' '-_' | tr -d '='; }
 detect_public_host() {
-  local detected=""
-  if command -v curl >/dev/null 2>&1; then
-    detected="$(curl -4fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
-  fi
-  if [[ -z "$detected" ]]; then
-    detected="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
-  fi
-  printf '%s' "$detected"
+  local host=""
+  command -v curl >/dev/null 2>&1 && host="$(curl -4fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
+  [[ -n "$host" ]] || host="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  printf '%s' "$host"
 }
-
-load_config() {
-  if [[ -f "$CONFIG_FILE" ]]; then
-    # shellcheck disable=SC1090
-    source "$CONFIG_FILE"
-  fi
-}
-
 read_value() {
-  local prompt="$1"
-  local default="$2"
-  local var
-  if [[ "$ASSUME_YES" -eq 1 ]]; then
-    printf '%s' "$default"
-    return
-  fi
-  if [[ -n "$default" ]]; then
-    read -r -p "${prompt} [${default}]: " var
-    printf '%s' "${var:-$default}"
-  else
-    read -r -p "${prompt}: " var
-    printf '%s' "$var"
-  fi
+  local prompt="$1" default="$2" value
+  [[ "$ASSUME_YES" -eq 0 ]] || { printf '%s' "$default"; return; }
+  if [[ -n "$default" ]]; then read -r -p "${prompt} [${default}]: " value; else read -r -p "${prompt}: " value; fi
+  printf '%s' "${value:-$default}"
+}
+confirm_default_yes() {
+  local answer
+  [[ "$ASSUME_YES" -eq 1 ]] && return 0
+  read -r -p "$1 [Y/n]: " answer
+  [[ -z "$answer" || "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]
 }
 
-normalize_client() {
-  case "${1:-}" in
-    anywhere) printf 'anywhere' ;;
-    vector) printf 'vector' ;;
-    both) printf 'both' ;;
-    *) return 1 ;;
-  esac
+validate_port() { [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
+validate_nonnegative_int() { [[ "$1" =~ ^[0-9]+$ ]]; }
+validate_carrier() {
+  case "$1" in tcp|tcp4|tcp6|udp|udp4|udp6|none) return 0 ;; *) return 1 ;; esac
 }
-
-client_label() {
-  case "${1:-anywhere}" in
-    anywhere) printf 'Anywhere 2.0' ;;
-    vector) printf 'Native Vector' ;;
-    both) printf 'Anywhere 2.0 + Native Vector' ;;
-  esac
+validate_tcp_carrier() { [[ "$1" == tcp || "$1" == tcp4 || "$1" == tcp6 || "$1" == none ]]; }
+validate_udp_carrier() { [[ "$1" == udp || "$1" == udp4 || "$1" == udp6 || "$1" == none ]]; }
+validate_policy() { [[ "$1" == tcp || "$1" == udp || "$1" == mix ]]; }
+validate_bool() { [[ "$1" == 0 || "$1" == 1 ]]; }
+validate_profile() { [[ "$1" == memory || "$1" == balanced || "$1" == throughput ]]; }
+validate_duration() { [[ "$1" =~ ^[0-9]+(ms|s|m|h)$ ]]; }
+validate_pin() { [[ "$1" == none || "$1" =~ ^[0-9a-f]{64}$ ]]; }
+validate_sni() { [[ "$1" == none || "$1" =~ ^[A-Za-z0-9.-]+$ ]]; }
+validate_socks() {
+  local value="$1" endpoint host port
+  [[ "$value" == none || -z "$value" ]] && return 0
+  [[ "$value" != *[[:space:]]* ]] || return 1
+  endpoint="${value##*@}"
+  if [[ "$endpoint" == \[*\]:* ]]; then host="${endpoint#\[}"; host="${host%%\]:*}"; port="${endpoint##*\]:}"; else host="${endpoint%:*}"; port="${endpoint##*:}"; fi
+  [[ -n "$host" ]] && validate_port "$port"
 }
+validate_vector_socks() { [[ "$1" != none && -n "$1" ]] && validate_socks "$1"; }
+carrier_for_policy() { [[ "$1" == tcp ]] && [[ "$NOWHERE_TCP_CARRIER" != none ]] || [[ "$1" == udp ]] && [[ "$NOWHERE_UDP_CARRIER" != none ]]; }
+validate_policy_for_endpoint() {
+  local up="$1" down="$2"
+  validate_policy "$up" && validate_policy "$down" || return 1
+  [[ "$up" != mix && "$down" != mix ]] || [[ "$NOWHERE_TCP_CARRIER" != none && "$NOWHERE_UDP_CARRIER" != none ]] || return 1
+  [[ "$up" == mix ]] || carrier_for_policy "$up" || return 1
+  [[ "$down" == mix ]] || carrier_for_policy "$down" || return 1
+}
+normalize_client() { case "$1" in anywhere|vector|both) printf '%s' "$1" ;; *) return 1 ;; esac; }
+client_label() { case "$1" in anywhere) printf 'Anywhere' ;; vector) printf 'Native Vector' ;; both) printf 'Anywhere + Native Vector' ;; esac; }
 
 validate_release_version() {
-  [[ "${1:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9._-]+)?$ ]]
-}
-
-version_at_least() {
-  local version="${1#v}" required_major="$2" required_minor="$3" required_patch="$4"
-  local major minor patch
-  version="${version%%-*}"
-  IFS=. read -r major minor patch <<<"$version"
-  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
-  (( 10#$major > required_major )) && return 0
-  (( 10#$major < required_major )) && return 1
-  (( 10#$minor > required_minor )) && return 0
-  (( 10#$minor < required_minor )) && return 1
-  (( 10#$patch >= required_patch ))
-}
-
-require_supported_version() {
-  validate_release_version "$1" || die "Invalid release version: $1"
-  version_at_least "$1" 1 5 0 || die "Nowhere versions before v1.5 are no longer supported by this script."
-}
-
-version_uses_mux() {
-  ! version_is_v2 "$1" && version_at_least "$1" 1 8 0
-}
-
-version_is_v2() {
   local version="${1#v}" major
-  version="${version%%-*}"
-  IFS=. read -r major _ <<<"$version"
-  [[ "$major" =~ ^[0-9]+$ ]] && (( 10#$major >= 2 ))
+  [[ "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9._-]+)?$ ]] || return 1
+  version="${version%%-*}"; IFS=. read -r major _ <<<"$version"
+  (( 10#$major >= 2 ))
 }
-
-version_major() {
-  local version="${1#v}" major
-  version="${version%%-*}"
-  IFS=. read -r major _ <<<"$version"
-  printf '%s' "$major"
-}
-
-validate_supported_version() {
+require_supported_version() { validate_release_version "$1" || die "Only Nowhere releases v2.0.0 and later are supported."; }
+validate_config() {
   require_supported_version "$NOWHERE_VERSION"
-}
-
-fetch_recent_releases() {
-  local api="https://api.github.com/repos/${REPO}/releases?per_page=10"
-  if command -v python3 >/dev/null 2>&1; then
-    curl -fsSL -H 'Accept: application/vnd.github+json' "$api" |
-      python3 -c 'import json,sys; [print(item["tag_name"]) for item in json.load(sys.stdin)[:10]]'
-  elif command -v python >/dev/null 2>&1; then
-    curl -fsSL -H 'Accept: application/vnd.github+json' "$api" |
-      python -c 'import json,sys; [sys.stdout.write(item["tag_name"] + "\n") for item in json.load(sys.stdin)[:10]]'
-  else
-    curl -fsSL -H 'Accept: application/vnd.github+json' "$api" |
-      sed -nE 's/^[[:space:]]*"tag_name":[[:space:]]*"([^"]+)".*/\1/p' |
-      head -n 10
-  fi
-}
-
-choose_release_version() {
-  local releases=() choice index release choice_number
-  command -v curl >/dev/null 2>&1 || die "curl is required to query GitHub Releases."
-  while IFS= read -r release; do
-    if [[ -n "$release" ]] && version_at_least "$release" 1 5 0; then
-      releases+=("$release")
-    fi
-  done < <(fetch_recent_releases)
-  [[ "${#releases[@]}" -gt 0 ]] || die "Could not read recent releases from GitHub."
-
-  echo
-  echo "最近 ${#releases[@]} 个受支持的 Nowhere Release："
-  for index in "${!releases[@]}"; do
-    release="${releases[$index]}"
-    printf ' %2d) %s\n' "$((index + 1))" "$release"
-  done
-  echo "  0) 取消"
-
-  while true; do
-    read -r -p "请选择要安装的版本: " choice
-    if [[ "$choice" == "0" ]]; then
-      return 1
-    fi
-    if [[ "$choice" =~ ^[0-9]+$ && "${#choice}" -le 2 ]]; then
-      choice_number=$((10#$choice))
-      if (( choice_number >= 1 && choice_number <= ${#releases[@]} )); then
-        SELECTED_VERSION="${releases[$((choice_number - 1))]}"
-        return 0
-      fi
-    fi
-    warn "请输入 0..${#releases[@]}。"
-  done
-}
-
-validate_port() {
-  [[ "$1" =~ ^[0-9]+$ ]] && [[ "$1" -ge 1 ]] && [[ "$1" -le 65535 ]]
-}
-
-validate_nonnegative_int() {
-  [[ "$1" =~ ^[0-9]+$ ]]
-}
-
-validate_telemetry_interval() {
-  local value="$1" amount
-  if [[ "$value" =~ ^([0-9]+)ms$ ]]; then
-    amount="${BASH_REMATCH[1]}"
-    [[ "${#amount}" -le 8 ]] || return 1
-    (( 10#$amount >= 250 && 10#$amount <= 60000 ))
-  elif [[ "$value" =~ ^([0-9]+)s$ ]]; then
-    amount="${BASH_REMATCH[1]}"
-    [[ "${#amount}" -le 8 ]] || return 1
-    (( 10#$amount >= 1 && 10#$amount <= 60 ))
-  else
-    return 1
-  fi
-}
-
-validate_vector_mux() {
-  [[ "$1" == "0" || "$1" == "1" ]]
-}
-
-validate_quic_memory_profile() {
-  [[ "$1" == "memory" || "$1" == "balanced" || "$1" == "throughput" ]]
-}
-
-validate_morph() {
-  [[ "$1" == "0" || "$1" == "1" ]]
-}
-
-validate_mix_fallback_timeout() {
-  [[ "$1" == "none" || "$1" =~ ^[0-9]+(ms|s)$ ]]
-}
-
-validate_socks() {
-  local socks="$1"
-  local endpoint userinfo host port
-
-  [[ -z "$socks" || "$socks" == "none" ]] && return 0
-  [[ "$socks" != *[[:space:]]* ]] || return 1
-
-  endpoint="$socks"
-  if [[ "$endpoint" == *@* ]]; then
-    userinfo="${endpoint%@*}"
-    endpoint="${endpoint##*@}"
-    [[ "$userinfo" == *:* ]] || return 1
-    [[ -n "${userinfo%%:*}" && -n "${userinfo#*:}" ]] || return 1
-    [[ "${#userinfo}" -le 511 ]] || return 1
-  fi
-
-  if [[ "$endpoint" == \[*\]:* ]]; then
-    host="${endpoint#\[}"
-    host="${host%%\]:*}"
-    port="${endpoint##*\]:}"
-  else
-    [[ "$endpoint" != *:*:* ]] || return 1
-    host="${endpoint%:*}"
-    port="${endpoint##*:}"
-  fi
-
-  [[ -n "$host" ]] || return 1
-  validate_port "$port"
-}
-
-validate_vector_socks() {
-  local socks="$1"
-  local endpoint userinfo host port
-
-  [[ -n "$socks" && "$socks" != "none" ]] || return 1
-  [[ "$socks" != *[[:space:]]* ]] || return 1
-
-  endpoint="$socks"
-  if [[ "$endpoint" == *@* ]]; then
-    userinfo="${endpoint%@*}"
-    endpoint="${endpoint##*@}"
-    [[ "$userinfo" == *:* ]] || return 1
-    [[ -n "${userinfo%%:*}" && -n "${userinfo#*:}" ]] || return 1
-    [[ "${#userinfo}" -le 511 ]] || return 1
-  fi
-
-  if [[ "$endpoint" == \[*\]:* ]]; then
-    host="${endpoint#\[}"
-    host="${host%%\]:*}"
-    port="${endpoint##*\]:}"
-    [[ -n "$host" ]] || return 1
-  else
-    [[ "$endpoint" != *:*:* ]] || return 1
-    host="${endpoint%:*}"
-    port="${endpoint##*:}"
-  fi
-
-  validate_port "$port"
-}
-
-validate_config_values() {
-  [[ -n "$NOWHERE_KEY" ]] || die "NOWHERE_KEY cannot be empty."
-  [[ "${#NOWHERE_KEY}" -le 255 ]] || die "NOWHERE_KEY must be <= 255 characters."
-  if version_is_v2 "$NOWHERE_VERSION"; then
-    [[ -n "${NOWHERE_TCP_PORT:-}" || -n "${NOWHERE_UDP_PORT:-}" ]] || die "V2 requires a TCP or UDP carrier port."
-    [[ -z "${NOWHERE_TCP_PORT:-}" ]] || validate_port "$NOWHERE_TCP_PORT" || die "Invalid V2 TCP port: ${NOWHERE_TCP_PORT:-}"
-    [[ -z "${NOWHERE_UDP_PORT:-}" ]] || validate_port "$NOWHERE_UDP_PORT" || die "Invalid V2 UDP port: ${NOWHERE_UDP_PORT:-}"
-    validate_morph "$NOWHERE_MORPH" || die "NOWHERE_MORPH must be 0 or 1."
-    validate_quic_memory_profile "$NOWHERE_TRANSPORT_MEMORY_PROFILE" || die "NOWHERE_TRANSPORT_MEMORY_PROFILE must be memory, balanced, or throughput."
-    validate_mix_fallback_timeout "$NOWHERE_MIX_FALLBACK_TIMEOUT" || die "NOWHERE_MIX_FALLBACK_TIMEOUT must be none or a duration such as 1s."
-  else
-    validate_port "$NOWHERE_PORT" || die "Invalid port: ${NOWHERE_PORT}"
-    [[ -z "$NOWHERE_ALPN" || "${#NOWHERE_ALPN}" -le 255 ]] || die "NOWHERE_ALPN must be <= 255 characters."
-    [[ "$NOWHERE_NET" == "mix" || "$NOWHERE_NET" == "tcp" || "$NOWHERE_NET" == "udp" ]] || die "NOWHERE_NET must be mix, tcp, or udp."
-  fi
-  [[ "$NOWHERE_TLS" == "1" || "$NOWHERE_TLS" == "2" ]] || die "NOWHERE_TLS must be 1 or 2."
-  validate_nonnegative_int "$NOWHERE_RATE" || die "NOWHERE_RATE must be a non-negative integer."
-  validate_nonnegative_int "$NOWHERE_ETAR" || die "NOWHERE_ETAR must be a non-negative integer."
-  validate_socks "$NOWHERE_SOCKS" || die "NOWHERE_SOCKS must be none, host:port, or user:pass@host:port. IPv6 endpoints require brackets."
-  validate_telemetry_interval "$NOWHERE_TELEMETRY_INTERVAL" || die "NOWHERE_TELEMETRY_INTERVAL must be 250ms..60000ms or 1s..60s."
-  [[ "$NOWHERE_LOG" == "none" || "$NOWHERE_LOG" == "debug" || "$NOWHERE_LOG" == "info" || "$NOWHERE_LOG" == "warn" || "$NOWHERE_LOG" == "error" || "$NOWHERE_LOG" == "event" ]] || die "Invalid log level: ${NOWHERE_LOG}"
   NOWHERE_CLIENT="$(normalize_client "$NOWHERE_CLIENT")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
-  validate_supported_version
-  if version_is_v2 "$NOWHERE_VERSION"; then
-    validate_vector_mux "$NOWHERE_VECTOR_MUX" || die "NOWHERE_VECTOR_MUX must be 0 or 1."
-  elif version_uses_mux "$NOWHERE_VERSION"; then
-    validate_quic_memory_profile "$NOWHERE_QUIC_MEMORY_PROFILE" || die "NOWHERE_QUIC_MEMORY_PROFILE must be memory, balanced, or throughput."
+  [[ -n "$NOWHERE_KEY" && "${#NOWHERE_KEY}" -le 255 ]] || die "NOWHERE_KEY must contain 1..255 characters."
+  validate_tcp_carrier "$NOWHERE_TCP_CARRIER" || die "NOWHERE_TCP_CARRIER must be tcp, tcp4, tcp6, or none."
+  validate_udp_carrier "$NOWHERE_UDP_CARRIER" || die "NOWHERE_UDP_CARRIER must be udp, udp4, udp6, or none."
+  [[ "$NOWHERE_TCP_CARRIER" != none || "$NOWHERE_UDP_CARRIER" != none ]] || die "Enable at least one carrier."
+  [[ "$NOWHERE_TCP_CARRIER" == none ]] || validate_port "$NOWHERE_TCP_PORT" || die "Invalid TCP port."
+  [[ "$NOWHERE_UDP_CARRIER" == none ]] || validate_port "$NOWHERE_UDP_PORT" || die "Invalid UDP port."
+  [[ "$NOWHERE_TLS" == 1 || "$NOWHERE_TLS" == 2 ]] || die "NOWHERE_TLS must be 1 or 2."
+  validate_bool "$NOWHERE_MORPH" || die "NOWHERE_MORPH must be 0 or 1."
+  validate_nonnegative_int "$NOWHERE_RATE" && validate_nonnegative_int "$NOWHERE_ETAR" || die "Rate limits must be non-negative integers."
+  validate_socks "$NOWHERE_SOCKS" || die "Invalid NOWHERE_SOCKS value."
+  [[ "$NOWHERE_LOG" =~ ^(none|debug|info|warn|error|event)$ ]] || die "Invalid log level."
+  validate_profile "$NOWHERE_TRANSPORT_MEMORY_PROFILE" || die "Invalid transport memory profile."
+  validate_duration "$NOWHERE_MIX_FALLBACK_TIMEOUT" || die "Invalid mix fallback timeout."
+  validate_duration "$NOWHERE_TELEMETRY_INTERVAL" || die "Invalid telemetry interval."
+  if [[ "$NOWHERE_TLS" == 2 ]]; then
+    [[ -n "$NOWHERE_CRT" && -n "$NOWHERE_TLS_KEY" ]] || die "tls=2 requires crt and key paths."
+    [[ -f "$NOWHERE_CRT" && -f "$NOWHERE_TLS_KEY" ]] || die "Certificate or private-key file does not exist."
   fi
-  if [[ "$NOWHERE_CLIENT" != "anywhere" && "$NOWHERE_VECTOR_PIN" != "none" ]] && ! version_at_least "$NOWHERE_VERSION" 1 5 1; then
-    die "NOWHERE_VECTOR_PIN requires Nowhere v1.5.1 or newer."
+  if [[ "$NOWHERE_NEXT" != none ]]; then
+    [[ "$NOWHERE_SOCKS" == none ]] || die "Portal next and SOCKS outbound paths are mutually exclusive."
+    [[ "$NOWHERE_NEXT" == *@* ]] || die "NOWHERE_NEXT must be key@host:port or an explicit carrier endpoint."
+    validate_policy_for_endpoint "$NOWHERE_NEXT_UP" "$NOWHERE_NEXT_DOWN" || die "Invalid next route policy for enabled carriers."
+    validate_bool "$NOWHERE_NEXT_MUX" && validate_sni "$NOWHERE_NEXT_SNI" && validate_pin "$NOWHERE_NEXT_PIN" || die "Invalid next Mux, SNI, or pin."
   fi
-  if ! version_is_v2 "$NOWHERE_VERSION" && ! version_uses_mux "$NOWHERE_VERSION"; then
-    if [[ "$NOWHERE_CLIENT" == "vector" ]]; then
-      [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 256 ]] || die "NOWHERE_POOL must be 0..256 for Native Vector."
-    else
-      [[ "$NOWHERE_POOL" =~ ^[0-9]+$ ]] && [[ "$NOWHERE_POOL" -ge 0 ]] && [[ "$NOWHERE_POOL" -le 9 ]] || die "NOWHERE_POOL must be 0..9 when Anywhere links are enabled."
-    fi
+  if [[ "$NOWHERE_CLIENT" == vector || "$NOWHERE_CLIENT" == both ]]; then
+    validate_policy_for_endpoint "$NOWHERE_VECTOR_UP" "$NOWHERE_VECTOR_DOWN" || die "Invalid Vector route policy for enabled carriers."
+    validate_bool "$NOWHERE_VECTOR_MUX" && validate_sni "$NOWHERE_VECTOR_SNI" && validate_pin "$NOWHERE_VECTOR_PIN" || die "Invalid Vector Mux, SNI, or pin."
+    validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "Invalid Vector SOCKS listener."
+    validate_nonnegative_int "$NOWHERE_VECTOR_RATE" && validate_nonnegative_int "$NOWHERE_VECTOR_ETAR" || die "Vector rate limits must be non-negative integers."
+    [[ "$NOWHERE_VECTOR_LOG" =~ ^(none|debug|info|warn|error|event)$ ]] || die "Invalid Vector log level."
   fi
-  if [[ "$NOWHERE_CLIENT" == "vector" ]]; then
-    validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "NOWHERE_VECTOR_SOCKS must be [user:pass@]host:port or :port."
-    [[ "$NOWHERE_VECTOR_SNI" == "none" || "$NOWHERE_VECTOR_SNI" =~ ^[A-Za-z0-9.-]+$ ]] || die "NOWHERE_VECTOR_SNI must be a DNS name or none."
-    [[ "$NOWHERE_VECTOR_PIN" == "none" || "$NOWHERE_VECTOR_PIN" =~ ^[0-9a-f]{64}$ ]] || die "NOWHERE_VECTOR_PIN must be none or 64 lowercase hexadecimal characters."
-    if version_is_v2 "$NOWHERE_VERSION" || version_uses_mux "$NOWHERE_VERSION"; then
-      validate_vector_mux "$NOWHERE_VECTOR_MUX" || die "NOWHERE_VECTOR_MUX must be 0 or 1."
-    fi
-  else
-    if [[ "$NOWHERE_CLIENT" == "both" ]]; then
-      validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "NOWHERE_VECTOR_SOCKS must be [user:pass@]host:port or :port."
-      [[ "$NOWHERE_VECTOR_SNI" == "none" || "$NOWHERE_VECTOR_SNI" =~ ^[A-Za-z0-9.-]+$ ]] || die "NOWHERE_VECTOR_SNI must be a DNS name or none."
-      [[ "$NOWHERE_VECTOR_PIN" == "none" || "$NOWHERE_VECTOR_PIN" =~ ^[0-9a-f]{64}$ ]] || die "NOWHERE_VECTOR_PIN must be none or 64 lowercase hexadecimal characters."
-      if version_is_v2 "$NOWHERE_VERSION" || version_uses_mux "$NOWHERE_VERSION"; then
-        validate_vector_mux "$NOWHERE_VECTOR_MUX" || die "NOWHERE_VECTOR_MUX must be 0 or 1."
-      fi
-    fi
-  fi
-  if [[ "$NOWHERE_TLS" == "2" ]]; then
-    [[ -n "$NOWHERE_CRT" && -n "$NOWHERE_TLS_KEY" ]] || die "tls=2 requires --crt and --tls-key."
-    [[ -f "$NOWHERE_CRT" ]] || die "Certificate file not found: ${NOWHERE_CRT}"
-    [[ -f "$NOWHERE_TLS_KEY" ]] || die "Private key file not found: ${NOWHERE_TLS_KEY}"
-  fi
-}
-
-build_portal_url() {
-  local encoded_key host_part query
-  encoded_key="$(urlencode "$NOWHERE_KEY")"
-  host_part="$(format_host_for_url "${NOWHERE_LISTEN_HOST:-}")"
-  if version_is_v2 "$NOWHERE_VERSION"; then
-    [[ -n "$host_part" ]] || host_part="*"
-    query="tls=${NOWHERE_TLS}&morph=${NOWHERE_MORPH}"
-    if [[ -n "$NOWHERE_DIAL" && "$NOWHERE_DIAL" != "auto" ]]; then
-      query="${query}&dial=$(urlencode "$NOWHERE_DIAL")"
-    fi
-    if [[ -n "$NOWHERE_SOCKS" && "$NOWHERE_SOCKS" != "$DEFAULT_SOCKS" ]]; then
-      query="${query}&socks=$(urlencode "$NOWHERE_SOCKS")"
-    fi
-    if [[ "$NOWHERE_RATE" != "0" ]]; then
-      query="${query}&rate=${NOWHERE_RATE}"
-    fi
-    if [[ "$NOWHERE_ETAR" != "0" ]]; then
-      query="${query}&etar=${NOWHERE_ETAR}"
-    fi
-    if [[ "$NOWHERE_TLS" == "2" ]]; then
-      query="${query}&crt=$(urlencode "$NOWHERE_CRT")&key=$(urlencode "$NOWHERE_TLS_KEY")"
-    fi
-    if [[ "$NOWHERE_LOG" != "$DEFAULT_LOG" ]]; then
-      query="${query}&log=${NOWHERE_LOG}"
-    fi
-    printf 'portal://%s@%s?%s' "$encoded_key" "$(build_endpoint "$host_part" "${NOWHERE_TCP_PORT:-}" "${NOWHERE_UDP_PORT:-}")" "$query"
-    return
-  fi
-  query="tls=${NOWHERE_TLS}"
-
-  if [[ -n "$NOWHERE_ALPN" && "$NOWHERE_ALPN" != "$DEFAULT_ALPN" ]]; then
-    query="${query}&alpn=$(urlencode "$NOWHERE_ALPN")"
-  fi
-  if [[ "$NOWHERE_NET" != "$DEFAULT_NET" ]]; then
-    query="${query}&net=${NOWHERE_NET}"
-  fi
-  if [[ -n "$NOWHERE_DIAL" && "$NOWHERE_DIAL" != "auto" ]]; then
-    query="${query}&dial=$(urlencode "$NOWHERE_DIAL")"
-  fi
-  if [[ -n "$NOWHERE_SOCKS" && "$NOWHERE_SOCKS" != "$DEFAULT_SOCKS" ]]; then
-    query="${query}&socks=$(urlencode "$NOWHERE_SOCKS")"
-  fi
-  if [[ "$NOWHERE_RATE" != "0" ]]; then
-    query="${query}&rate=${NOWHERE_RATE}"
-  fi
-  if [[ "$NOWHERE_ETAR" != "0" ]]; then
-    query="${query}&etar=${NOWHERE_ETAR}"
-  fi
-  if [[ "$NOWHERE_TLS" == "2" ]]; then
-    query="${query}&crt=$(urlencode "$NOWHERE_CRT")&key=$(urlencode "$NOWHERE_TLS_KEY")"
-  fi
-  if [[ "$NOWHERE_LOG" != "$DEFAULT_LOG" ]]; then
-    query="${query}&log=${NOWHERE_LOG}"
-  fi
-
-  printf 'portal://%s@%s:%s?%s' "$encoded_key" "$host_part" "$NOWHERE_PORT" "$query"
 }
 
 build_endpoint() {
-  local host="$1" tcp_port="${2:-}" udp_port="${3:-}"
-  if [[ -n "$tcp_port" && -n "$udp_port" && "$tcp_port" == "$udp_port" ]]; then
+  local host="$1" tcp_carrier="$2" tcp_port="$3" udp_carrier="$4" udp_port="$5"
+  if [[ "$tcp_carrier" != none && "$udp_carrier" != none && "$tcp_carrier" == tcp && "$udp_carrier" == udp && "$tcp_port" == "$udp_port" ]]; then
     printf '%s:%s' "$host" "$tcp_port"
-  elif [[ -n "$tcp_port" && -n "$udp_port" ]]; then
-    printf '%s/tcp:%s/udp:%s' "$host" "$tcp_port" "$udp_port"
-  elif [[ -n "$tcp_port" ]]; then
-    printf '%s/tcp:%s' "$host" "$tcp_port"
+  elif [[ "$tcp_carrier" != none && "$udp_carrier" != none ]]; then
+    printf '%s/%s:%s/%s:%s' "$host" "$tcp_carrier" "$tcp_port" "$udp_carrier" "$udp_port"
+  elif [[ "$tcp_carrier" != none ]]; then
+    printf '%s/%s:%s' "$host" "$tcp_carrier" "$tcp_port"
   else
-    printf '%s/udp:%s' "$host" "$udp_port"
+    printf '%s/%s:%s' "$host" "$udp_carrier" "$udp_port"
   fi
 }
-
-build_anywhere_client_query() {
-  local up="$1"
-  local down="$2"
-  local query
-  query="up=${up}&down=${down}"
-
-  if version_is_v2 "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}"; then
-    query="${query}&morph=${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}&mux=${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_VECTOR_MUX}"
-    printf '%s' "$query"
-    return
-  fi
-
-  if ! version_uses_mux "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}" && [[ "$up" == "tcp" && "$down" == "tcp" ]]; then
-    query="${query}&pool=${NOWHERE_POOL_VALUE:-$DEFAULT_POOL}"
-  fi
-  if [[ -n "${NOWHERE_ALPN_VALUE:-}" && "$NOWHERE_ALPN_VALUE" != "$DEFAULT_ALPN" ]]; then
-    query="${query}&alpn=$(urlencode "$NOWHERE_ALPN_VALUE")"
-  fi
-
-  printf '%s' "$query"
+carrier_without_family() {
+  case "$1" in tcp4|tcp6) printf tcp ;; udp4|udp6) printf udp ;; *) printf '%s' "$1" ;; esac
 }
-
+build_portal_url() {
+  local key host query endpoint
+  key="$(urlencode "$NOWHERE_KEY")"
+  host="$(format_host_for_url "$NOWHERE_LISTEN_HOST")"
+  [[ -n "$host" ]] || host="*"
+  endpoint="$(build_endpoint "$host" "$NOWHERE_TCP_CARRIER" "$NOWHERE_TCP_PORT" "$NOWHERE_UDP_CARRIER" "$NOWHERE_UDP_PORT")"
+  query="tls=${NOWHERE_TLS}&morph=${NOWHERE_MORPH}"
+  [[ "$NOWHERE_RATE" == 0 ]] || query="${query}&rate=${NOWHERE_RATE}"
+  [[ "$NOWHERE_ETAR" == 0 ]] || query="${query}&etar=${NOWHERE_ETAR}"
+  [[ "$NOWHERE_DIAL" == auto ]] || query="${query}&dial=$(urlencode "$NOWHERE_DIAL")"
+  [[ "$NOWHERE_SOCKS" == none ]] || query="${query}&socks=$(urlencode "$NOWHERE_SOCKS")"
+  if [[ "$NOWHERE_NEXT" != none ]]; then
+    query="${query}&next=$(urlencode "$NOWHERE_NEXT")&up=${NOWHERE_NEXT_UP}&down=${NOWHERE_NEXT_DOWN}&mux=${NOWHERE_NEXT_MUX}"
+    query="${query}&sni=$(urlencode "$NOWHERE_NEXT_SNI")&pin=$(urlencode "$NOWHERE_NEXT_PIN")"
+  fi
+  [[ "$NOWHERE_TLS" != 2 ]] || query="${query}&crt=$(urlencode "$NOWHERE_CRT")&key=$(urlencode "$NOWHERE_TLS_KEY")"
+  [[ "$NOWHERE_LOG" == "$DEFAULT_LOG" ]] || query="${query}&log=${NOWHERE_LOG}"
+  printf 'portal://%s@%s?%s' "$key" "$endpoint" "$query"
+}
 build_vector_query() {
-  local up="$1"
-  local down="$2"
-  local query="up=${up}&down=${down}"
-
-  if version_is_v2 "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}"; then
-    query="${query}&morph=${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}&mux=${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_VECTOR_MUX}"
-    query="${query}&sni=$(urlencode "${NOWHERE_VECTOR_SNI_VALUE:-$DEFAULT_VECTOR_SNI}")"
-    query="${query}&pin=$(urlencode "${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_VECTOR_PIN}")"
-    query="${query}&socks=$(urlencode "${NOWHERE_VECTOR_SOCKS_VALUE:-$DEFAULT_VECTOR_SOCKS}")"
-    printf '%s' "$query"
-    return
-  fi
-
-  if ! version_uses_mux "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}" && [[ "$up" == "tcp" && "$down" == "tcp" ]]; then
-    query="${query}&pool=${NOWHERE_POOL_VALUE:-$DEFAULT_POOL}"
-  fi
-  if version_uses_mux "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}"; then
-    query="${query}&mux=${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_VECTOR_MUX}"
-  fi
-  query="${query}&sni=$(urlencode "${NOWHERE_VECTOR_SNI_VALUE:-$DEFAULT_VECTOR_SNI}")"
-  if version_at_least "${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}" 1 5 1; then
-    query="${query}&pin=$(urlencode "${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_VECTOR_PIN}")"
-  fi
-  if [[ -n "${NOWHERE_ALPN_VALUE:-}" && "$NOWHERE_ALPN_VALUE" != "$DEFAULT_ALPN" ]]; then
-    query="${query}&alpn=$(urlencode "$NOWHERE_ALPN_VALUE")"
-  fi
-  query="${query}&socks=$(urlencode "${NOWHERE_VECTOR_SOCKS_VALUE:-$DEFAULT_VECTOR_SOCKS}")"
-
+  local up="${NOWHERE_VECTOR_UP_VALUE:-tcp}" down="${NOWHERE_VECTOR_DOWN_VALUE:-tcp}" mux="${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_MUX}"
+  local sni="${NOWHERE_VECTOR_SNI_VALUE:-$DEFAULT_SNI}" pin="${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_PIN}" morph="${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}"
+  local socks="${NOWHERE_VECTOR_SOCKS_VALUE:-$DEFAULT_VECTOR_SOCKS}" rate="${NOWHERE_VECTOR_RATE_VALUE:-0}" etar="${NOWHERE_VECTOR_ETAR_VALUE:-0}" log="${NOWHERE_VECTOR_LOG_VALUE:-$DEFAULT_LOG}"
+  local query="up=${up}&down=${down}&mux=${mux}"
+  query="${query}&sni=$(urlencode "$sni")&pin=$(urlencode "$pin")"
+  query="${query}&morph=${morph}&socks=$(urlencode "$socks")"
+  [[ "$rate" == 0 ]] || query="${query}&rate=${rate}"
+  [[ "$etar" == 0 ]] || query="${query}&etar=${etar}"
+  [[ "$log" == "$DEFAULT_LOG" ]] || query="${query}&log=${log}"
   printf '%s' "$query"
 }
-
-default_vector_sni_for() {
-  local host="${1:-}"
-  local tls_mode="${2:-1}"
-  host="$(strip_brackets "$host")"
-  if [[ "$tls_mode" == "2" && "$host" =~ [A-Za-z] && "$host" != *:* ]]; then
-    printf '%s' "$host"
-  else
-    printf '%s' "$DEFAULT_VECTOR_SNI"
-  fi
+build_anywhere_query() {
+  local up="$1" down="$2"
+  printf 'up=%s&down=%s&morph=%s&mux=%s' "$up" "$down" "${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}" "${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_MUX}"
 }
 
 configure_values() {
   load_config
-
-  local generated_key detected_host default_tls saved_client
-  generated_key="$(random_token 24)"
-  detected_host="$(detect_public_host)"
-
-  NOWHERE_VERSION="${NOWHERE_VERSION:-${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}}"
-  if [[ -n "${NOWHERE_CLIENT_VALUE:-}" ]]; then
-    saved_client="$(normalize_client "$NOWHERE_CLIENT_VALUE")" || saved_client="$DEFAULT_CLIENT"
-  else
-    saved_client="$DEFAULT_CLIENT"
-  fi
-  NOWHERE_CLIENT="$(normalize_client "${NOWHERE_CLIENT:-$saved_client}")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
-
-  NOWHERE_PORT="${NOWHERE_PORT:-${NOWHERE_PORT_VALUE:-$DEFAULT_PORT}}"
-  NOWHERE_TCP_PORT="${NOWHERE_TCP_PORT:-${NOWHERE_TCP_PORT_VALUE:-}}"
-  NOWHERE_UDP_PORT="${NOWHERE_UDP_PORT:-${NOWHERE_UDP_PORT_VALUE:-}}"
-  NOWHERE_KEY="${NOWHERE_KEY:-${NOWHERE_KEY_VALUE:-$generated_key}}"
-  NOWHERE_NET="${NOWHERE_NET:-${NOWHERE_NET_VALUE:-$DEFAULT_NET}}"
-  NOWHERE_ALPN="${NOWHERE_ALPN:-${NOWHERE_ALPN_VALUE:-$DEFAULT_ALPN}}"
-  NOWHERE_RATE="${NOWHERE_RATE:-${NOWHERE_RATE_VALUE:-0}}"
-  NOWHERE_ETAR="${NOWHERE_ETAR:-${NOWHERE_ETAR_VALUE:-0}}"
-  NOWHERE_DIAL="${NOWHERE_DIAL:-${NOWHERE_DIAL_VALUE:-auto}}"
-  NOWHERE_SOCKS="${NOWHERE_SOCKS:-${NOWHERE_SOCKS_VALUE:-$DEFAULT_SOCKS}}"
-  NOWHERE_LOG="${NOWHERE_LOG:-${NOWHERE_LOG_VALUE:-$DEFAULT_LOG}}"
-  NOWHERE_TELEMETRY_INTERVAL="${NOWHERE_TELEMETRY_INTERVAL:-${NOW_TELEMETRY_INTERVAL:-${NOWHERE_TELEMETRY_INTERVAL_VALUE:-$DEFAULT_TELEMETRY_INTERVAL}}}"
-  NOWHERE_POOL="${NOWHERE_POOL:-${NOWHERE_POOL_VALUE:-$DEFAULT_POOL}}"
-  NOWHERE_VECTOR_SOCKS="${NOWHERE_VECTOR_SOCKS:-${NOWHERE_VECTOR_SOCKS_VALUE:-$DEFAULT_VECTOR_SOCKS}}"
-  NOWHERE_VECTOR_SNI="${NOWHERE_VECTOR_SNI:-${NOWHERE_VECTOR_SNI_VALUE:-}}"
-  NOWHERE_VECTOR_PIN="${NOWHERE_VECTOR_PIN:-${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_VECTOR_PIN}}"
-  NOWHERE_VECTOR_MUX="${NOWHERE_VECTOR_MUX:-${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_VECTOR_MUX}}"
-  NOWHERE_QUIC_MEMORY_PROFILE="${NOWHERE_QUIC_MEMORY_PROFILE:-${NOWHERE_QUIC_MEMORY_PROFILE_VALUE:-${NOW_QUIC_MEMORY_PROFILE:-$DEFAULT_QUIC_MEMORY_PROFILE}}}"
-  NOWHERE_TRANSPORT_MEMORY_PROFILE="${NOWHERE_TRANSPORT_MEMORY_PROFILE:-${NOWHERE_TRANSPORT_MEMORY_PROFILE_VALUE:-${NOW_TRANSPORT_MEMORY_PROFILE:-$DEFAULT_TRANSPORT_MEMORY_PROFILE}}}"
-  NOWHERE_MORPH="${NOWHERE_MORPH:-${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}}"
-  NOWHERE_MIX_FALLBACK_TIMEOUT="${NOWHERE_MIX_FALLBACK_TIMEOUT:-${NOWHERE_MIX_FALLBACK_TIMEOUT_VALUE:-${NOW_MIX_FALLBACK_TIMEOUT:-$DEFAULT_MIX_FALLBACK_TIMEOUT}}}"
+  local generated_key detected_host default_tls path
+  generated_key="$(random_token)"; detected_host="$(detect_public_host)"
+  NOWHERE_VERSION="${NOWHERE_VERSION:-${NOWHERE_VERSION_VALUE:-$DEFAULT_VERSION}}"
+  require_supported_version "$NOWHERE_VERSION"
+  NOWHERE_CLIENT="${NOWHERE_CLIENT:-${NOWHERE_CLIENT_VALUE:-$DEFAULT_CLIENT}}"
   NOWHERE_PUBLIC_HOST="${NOWHERE_PUBLIC_HOST:-${NOWHERE_PUBLIC_HOST_VALUE:-$detected_host}}"
   NOWHERE_LISTEN_HOST="${NOWHERE_LISTEN_HOST:-${NOWHERE_LISTEN_HOST_VALUE:-}}"
-  NOWHERE_CRT="${NOWHERE_CRT:-${NOWHERE_CRT_VALUE:-}}"
-  NOWHERE_TLS_KEY="${NOWHERE_TLS_KEY:-${NOWHERE_TLS_KEY_VALUE:-}}"
-  default_tls="1"
-  if [[ -n "$NOWHERE_CRT" || -n "$NOWHERE_TLS_KEY" ]]; then
-    default_tls="2"
-  fi
+  NOWHERE_KEY="${NOWHERE_KEY:-${NOWHERE_KEY_VALUE:-$generated_key}}"
+  NOWHERE_TCP_CARRIER="${NOWHERE_TCP_CARRIER:-${NOWHERE_TCP_CARRIER_VALUE:-$DEFAULT_TCP_CARRIER}}"
+  NOWHERE_TCP_PORT="${NOWHERE_TCP_PORT:-${NOWHERE_TCP_PORT_VALUE:-$DEFAULT_PORT}}"
+  NOWHERE_UDP_CARRIER="${NOWHERE_UDP_CARRIER:-${NOWHERE_UDP_CARRIER_VALUE:-$DEFAULT_UDP_CARRIER}}"
+  NOWHERE_UDP_PORT="${NOWHERE_UDP_PORT:-${NOWHERE_UDP_PORT_VALUE:-$DEFAULT_PORT}}"
+  NOWHERE_CRT="${NOWHERE_CRT:-${NOWHERE_CRT_VALUE:-}}"; NOWHERE_TLS_KEY="${NOWHERE_TLS_KEY:-${NOWHERE_TLS_KEY_VALUE:-}}"
+  default_tls="$DEFAULT_TLS"; [[ -n "$NOWHERE_CRT$NOWHERE_TLS_KEY" ]] && default_tls=2
   NOWHERE_TLS="${NOWHERE_TLS:-${NOWHERE_TLS_VALUE:-$default_tls}}"
-
-  if version_is_v2 "$NOWHERE_VERSION"; then
-    case "$NOWHERE_NET" in
-      mix)
-        NOWHERE_TCP_PORT="${NOWHERE_TCP_PORT:-$NOWHERE_PORT}"
-        NOWHERE_UDP_PORT="${NOWHERE_UDP_PORT:-$NOWHERE_PORT}"
-        ;;
-      tcp) NOWHERE_TCP_PORT="${NOWHERE_TCP_PORT:-$NOWHERE_PORT}"; NOWHERE_UDP_PORT="" ;;
-      udp) NOWHERE_TCP_PORT=""; NOWHERE_UDP_PORT="${NOWHERE_UDP_PORT:-$NOWHERE_PORT}" ;;
-    esac
-  fi
+  NOWHERE_MORPH="${NOWHERE_MORPH:-${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}}"
+  NOWHERE_RATE="${NOWHERE_RATE:-${NOWHERE_RATE_VALUE:-0}}"; NOWHERE_ETAR="${NOWHERE_ETAR:-${NOWHERE_ETAR_VALUE:-0}}"
+  NOWHERE_DIAL="${NOWHERE_DIAL:-${NOWHERE_DIAL_VALUE:-auto}}"; NOWHERE_SOCKS="${NOWHERE_SOCKS:-${NOWHERE_SOCKS_VALUE:-$DEFAULT_SOCKS}}"
+  NOWHERE_NEXT="${NOWHERE_NEXT:-${NOWHERE_NEXT_VALUE:-none}}"; NOWHERE_NEXT_UP="${NOWHERE_NEXT_UP:-${NOWHERE_NEXT_UP_VALUE:-tcp}}"; NOWHERE_NEXT_DOWN="${NOWHERE_NEXT_DOWN:-${NOWHERE_NEXT_DOWN_VALUE:-tcp}}"
+  NOWHERE_NEXT_MUX="${NOWHERE_NEXT_MUX:-${NOWHERE_NEXT_MUX_VALUE:-$DEFAULT_MUX}}"; NOWHERE_NEXT_SNI="${NOWHERE_NEXT_SNI:-${NOWHERE_NEXT_SNI_VALUE:-$DEFAULT_SNI}}"; NOWHERE_NEXT_PIN="${NOWHERE_NEXT_PIN:-${NOWHERE_NEXT_PIN_VALUE:-$DEFAULT_PIN}}"
+  NOWHERE_VECTOR_UP="${NOWHERE_VECTOR_UP:-${NOWHERE_VECTOR_UP_VALUE:-tcp}}"; NOWHERE_VECTOR_DOWN="${NOWHERE_VECTOR_DOWN:-${NOWHERE_VECTOR_DOWN_VALUE:-tcp}}"
+  NOWHERE_VECTOR_MUX="${NOWHERE_VECTOR_MUX:-${NOWHERE_VECTOR_MUX_VALUE:-$DEFAULT_MUX}}"; NOWHERE_VECTOR_SOCKS="${NOWHERE_VECTOR_SOCKS:-${NOWHERE_VECTOR_SOCKS_VALUE:-$DEFAULT_VECTOR_SOCKS}}"
+  NOWHERE_VECTOR_SNI="${NOWHERE_VECTOR_SNI:-${NOWHERE_VECTOR_SNI_VALUE:-$DEFAULT_SNI}}"; NOWHERE_VECTOR_PIN="${NOWHERE_VECTOR_PIN:-${NOWHERE_VECTOR_PIN_VALUE:-$DEFAULT_PIN}}"
+  NOWHERE_VECTOR_RATE="${NOWHERE_VECTOR_RATE:-${NOWHERE_VECTOR_RATE_VALUE:-0}}"; NOWHERE_VECTOR_ETAR="${NOWHERE_VECTOR_ETAR:-${NOWHERE_VECTOR_ETAR_VALUE:-0}}"; NOWHERE_VECTOR_LOG="${NOWHERE_VECTOR_LOG:-${NOWHERE_VECTOR_LOG_VALUE:-$DEFAULT_LOG}}"
+  NOWHERE_LOG="${NOWHERE_LOG:-${NOWHERE_LOG_VALUE:-$DEFAULT_LOG}}"; NOWHERE_TRANSPORT_MEMORY_PROFILE="${NOWHERE_TRANSPORT_MEMORY_PROFILE:-${NOWHERE_TRANSPORT_MEMORY_PROFILE_VALUE:-${NOW_TRANSPORT_MEMORY_PROFILE:-$DEFAULT_TRANSPORT_MEMORY_PROFILE}}}"
+  NOWHERE_MIX_FALLBACK_TIMEOUT="${NOWHERE_MIX_FALLBACK_TIMEOUT:-${NOWHERE_MIX_FALLBACK_TIMEOUT_VALUE:-${NOW_MIX_FALLBACK_TIMEOUT:-$DEFAULT_MIX_FALLBACK_TIMEOUT}}}"
+  NOWHERE_TELEMETRY_INTERVAL="${NOWHERE_TELEMETRY_INTERVAL:-${NOWHERE_TELEMETRY_INTERVAL_VALUE:-${NOW_TELEMETRY_INTERVAL:-$DEFAULT_TELEMETRY_INTERVAL}}}"
 
   if [[ "$ASSUME_YES" -eq 0 ]]; then
-    info "进入 Nowhere 配置向导：一路回车即可使用默认值。"
-    NOWHERE_CLIENT="$(read_value "客户端链接 anywhere/vector/both" "$NOWHERE_CLIENT")"
-    NOWHERE_PUBLIC_HOST="$(read_value "公网域名/IP，用于客户端连接" "$NOWHERE_PUBLIC_HOST")"
-    NOWHERE_LISTEN_HOST="$(read_value "监听地址，留空表示 IPv4/IPv6 全部监听" "$NOWHERE_LISTEN_HOST")"
-    NOWHERE_PORT="$(read_value "监听端口" "$NOWHERE_PORT")"
-    NOWHERE_KEY="$(read_value "Shared Key" "$NOWHERE_KEY")"
-    NOWHERE_NET="$(read_value "监听模式 mix/tcp/udp" "$NOWHERE_NET")"
-    if version_is_v2 "$NOWHERE_VERSION"; then
-      case "$NOWHERE_NET" in
-        mix)
-          NOWHERE_TCP_PORT="$(read_value "V2 TCP 端口" "${NOWHERE_TCP_PORT:-$NOWHERE_PORT}")"
-          NOWHERE_UDP_PORT="$(read_value "V2 UDP 端口" "${NOWHERE_UDP_PORT:-$NOWHERE_PORT}")"
-          ;;
-        tcp) NOWHERE_TCP_PORT="$(read_value "V2 TCP 端口" "${NOWHERE_TCP_PORT:-$NOWHERE_PORT}")"; NOWHERE_UDP_PORT="" ;;
-        udp) NOWHERE_TCP_PORT=""; NOWHERE_UDP_PORT="$(read_value "V2 UDP 端口" "${NOWHERE_UDP_PORT:-$NOWHERE_PORT}")" ;;
-      esac
-      NOWHERE_MORPH="$(read_value "V2 Morph 0=关闭，1=ChaCha20 线缆变换" "$NOWHERE_MORPH")"
-      NOWHERE_TRANSPORT_MEMORY_PROFILE="$(read_value "V2 传输内存策略 memory/balanced/throughput" "$NOWHERE_TRANSPORT_MEMORY_PROFILE")"
-      NOWHERE_MIX_FALLBACK_TIMEOUT="$(read_value "V2 mix 回退延迟 none/如 1s" "$NOWHERE_MIX_FALLBACK_TIMEOUT")"
-    else
-      NOWHERE_ALPN="$(read_value "ALPN" "$NOWHERE_ALPN")"
-    fi
-    NOWHERE_TLS="$(read_value "TLS 模式：1=临时自签，2=PEM 证书" "$NOWHERE_TLS")"
-    if [[ "$NOWHERE_TLS" == "2" ]]; then
-      NOWHERE_CRT="$(read_value "证书链路径 fullchain.pem/cert.pem" "$NOWHERE_CRT")"
-      NOWHERE_TLS_KEY="$(read_value "私钥路径 privkey.pem/key.pem" "$NOWHERE_TLS_KEY")"
-    fi
-    NOWHERE_RATE="$(read_value "上行限速 Mbps，0 表示不限速" "$NOWHERE_RATE")"
-    NOWHERE_ETAR="$(read_value "下行限速 Mbps，0 表示不限速" "$NOWHERE_ETAR")"
-    NOWHERE_DIAL="$(read_value "出站源 IP，auto 表示系统默认" "$NOWHERE_DIAL")"
-    NOWHERE_SOCKS="$(read_value "SOCKS5 出站代理，none/host:port/user:pass@host:port" "$NOWHERE_SOCKS")"
-    NOWHERE_LOG="$(read_value "日志级别 none/debug/info/warn/error/event" "$NOWHERE_LOG")"
-    NOWHERE_TELEMETRY_INTERVAL="$(read_value "TUI 遥测刷新间隔 250ms..60s" "$NOWHERE_TELEMETRY_INTERVAL")"
-    if version_uses_mux "$NOWHERE_VERSION"; then
-      NOWHERE_QUIC_MEMORY_PROFILE="$(read_value "QUIC 内存策略 memory/balanced/throughput" "$NOWHERE_QUIC_MEMORY_PROFILE")"
-    fi
-    if [[ "$NOWHERE_CLIENT" == "vector" || "$NOWHERE_CLIENT" == "both" ]]; then
-      if version_is_v2 "$NOWHERE_VERSION"; then
-        NOWHERE_VECTOR_MUX="$(read_value "Vector Mux 0=自适应载波池，1=单一 Mux" "$NOWHERE_VECTOR_MUX")"
-      elif version_uses_mux "$NOWHERE_VERSION"; then
-        NOWHERE_VECTOR_MUX="$(read_value "Vector TLS Mux 0=专用连接，1=共享 Mux" "$NOWHERE_VECTOR_MUX")"
-      elif [[ "$NOWHERE_CLIENT" == "both" ]]; then
-        NOWHERE_POOL="$(read_value "TCP pool（Anywhere 限制为 0..9）" "$NOWHERE_POOL")"
-      else
-        NOWHERE_POOL="$(read_value "Native Vector TCP pool，0..256" "$NOWHERE_POOL")"
-      fi
-      NOWHERE_VECTOR_SOCKS="$(read_value "Vector 本地 SOCKS5 监听地址" "$NOWHERE_VECTOR_SOCKS")"
-      if [[ -z "$NOWHERE_VECTOR_SNI" ]]; then
-        NOWHERE_VECTOR_SNI="$(default_vector_sni_for "$NOWHERE_PUBLIC_HOST" "$NOWHERE_TLS")"
-      fi
-      NOWHERE_VECTOR_SNI="$(read_value "Vector SNI，none 表示不校验证书" "$NOWHERE_VECTOR_SNI")"
-      NOWHERE_VECTOR_PIN="$(read_value "Vector 证书 SHA-256 pin，none 表示不固定证书" "$NOWHERE_VECTOR_PIN")"
-    elif ! version_uses_mux "$NOWHERE_VERSION"; then
-      NOWHERE_POOL="$(read_value "Anywhere TCP pool，0..9" "$NOWHERE_POOL")"
-    fi
+    info "Nowhere configuration wizard. Press Enter to keep defaults."
+    NOWHERE_CLIENT="$(read_value "Client output anywhere/vector/both" "$NOWHERE_CLIENT")"
+    NOWHERE_PUBLIC_HOST="$(read_value "Public domain/IP" "$NOWHERE_PUBLIC_HOST")"; NOWHERE_LISTEN_HOST="$(read_value "Listen host, empty means wildcard" "$NOWHERE_LISTEN_HOST")"
+    NOWHERE_TCP_CARRIER="$(read_value "TCP carrier tcp/tcp4/tcp6/none" "$NOWHERE_TCP_CARRIER")"
+    [[ "$NOWHERE_TCP_CARRIER" == none ]] || NOWHERE_TCP_PORT="$(read_value "TCP port" "$NOWHERE_TCP_PORT")"
+    NOWHERE_UDP_CARRIER="$(read_value "UDP carrier udp/udp4/udp6/none" "$NOWHERE_UDP_CARRIER")"
+    [[ "$NOWHERE_UDP_CARRIER" == none ]] || NOWHERE_UDP_PORT="$(read_value "UDP port" "$NOWHERE_UDP_PORT")"
+    NOWHERE_KEY="$(read_value "Shared Key" "$NOWHERE_KEY")"; NOWHERE_TLS="$(read_value "TLS 1=self-signed, 2=PEM" "$NOWHERE_TLS")"
+    if [[ "$NOWHERE_TLS" == 2 ]]; then NOWHERE_CRT="$(read_value "Certificate chain absolute path" "$NOWHERE_CRT")"; NOWHERE_TLS_KEY="$(read_value "Private key absolute path" "$NOWHERE_TLS_KEY")"; fi
+    NOWHERE_MORPH="$(read_value "Morph 0=off, 1=ChaCha20 transform" "$NOWHERE_MORPH")"; NOWHERE_RATE="$(read_value "Rate Mbps, 0=unlimited" "$NOWHERE_RATE")"; NOWHERE_ETAR="$(read_value "Etar Mbps, 0=unlimited" "$NOWHERE_ETAR")"
+    NOWHERE_DIAL="$(read_value "Outbound source IP, auto=system default" "$NOWHERE_DIAL")"; path="$(read_value "Outbound path direct/socks/next" "$([[ "$NOWHERE_NEXT" != none ]] && printf next || [[ "$NOWHERE_SOCKS" != none ]] && printf socks || printf direct)")"
+    case "$path" in direct) NOWHERE_SOCKS=none; NOWHERE_NEXT=none ;; socks) NOWHERE_NEXT=none; NOWHERE_SOCKS="$(read_value "Outbound SOCKS5" "$NOWHERE_SOCKS")" ;; next) NOWHERE_SOCKS=none; NOWHERE_NEXT="$(read_value "Next key@endpoint" "$NOWHERE_NEXT")"; NOWHERE_NEXT_UP="$(read_value "Next up tcp/udp/mix" "$NOWHERE_NEXT_UP")"; NOWHERE_NEXT_DOWN="$(read_value "Next down tcp/udp/mix" "$NOWHERE_NEXT_DOWN")"; NOWHERE_NEXT_MUX="$(read_value "Next Mux 0/1" "$NOWHERE_NEXT_MUX")"; NOWHERE_NEXT_SNI="$(read_value "Next SNI/none" "$NOWHERE_NEXT_SNI")"; NOWHERE_NEXT_PIN="$(read_value "Next certificate pin/none" "$NOWHERE_NEXT_PIN")" ;; *) die "Outbound path must be direct, socks, or next." ;; esac
+    NOWHERE_LOG="$(read_value "Log level" "$NOWHERE_LOG")"; NOWHERE_TRANSPORT_MEMORY_PROFILE="$(read_value "Transport memory memory/balanced/throughput" "$NOWHERE_TRANSPORT_MEMORY_PROFILE")"; NOWHERE_MIX_FALLBACK_TIMEOUT="$(read_value "Mix fallback timeout" "$NOWHERE_MIX_FALLBACK_TIMEOUT")"; NOWHERE_TELEMETRY_INTERVAL="$(read_value "TUI telemetry interval" "$NOWHERE_TELEMETRY_INTERVAL")"
+    if [[ "$NOWHERE_CLIENT" == vector || "$NOWHERE_CLIENT" == both ]]; then NOWHERE_VECTOR_UP="$(read_value "Vector up tcp/udp/mix" "$NOWHERE_VECTOR_UP")"; NOWHERE_VECTOR_DOWN="$(read_value "Vector down tcp/udp/mix" "$NOWHERE_VECTOR_DOWN")"; NOWHERE_VECTOR_MUX="$(read_value "Vector Mux 0/1" "$NOWHERE_VECTOR_MUX")"; NOWHERE_VECTOR_SOCKS="$(read_value "Vector local SOCKS5" "$NOWHERE_VECTOR_SOCKS")"; NOWHERE_VECTOR_SNI="$(read_value "Vector SNI/none" "$NOWHERE_VECTOR_SNI")"; NOWHERE_VECTOR_PIN="$(read_value "Vector certificate pin/none" "$NOWHERE_VECTOR_PIN")"; NOWHERE_VECTOR_RATE="$(read_value "Vector rate Mbps, 0=unlimited" "$NOWHERE_VECTOR_RATE")"; NOWHERE_VECTOR_ETAR="$(read_value "Vector etar Mbps, 0=unlimited" "$NOWHERE_VECTOR_ETAR")"; NOWHERE_VECTOR_LOG="$(read_value "Vector log level" "$NOWHERE_VECTOR_LOG")"; fi
   fi
-
-  if [[ "$NOWHERE_CLIENT" == "vector" || "$NOWHERE_CLIENT" == "both" ]] && [[ -z "$NOWHERE_VECTOR_SNI" ]]; then
-    NOWHERE_VECTOR_SNI="$(default_vector_sni_for "$NOWHERE_PUBLIC_HOST" "$NOWHERE_TLS")"
-  fi
-
-  validate_config_values
+  validate_config
   NOWHERE_PORTAL="$(build_portal_url)"
-  if [[ "$ASSUME_YES" -eq 0 ]]; then
-    print_config_summary
-    confirm_default_yes "确认保存并应用以上配置吗？" || die "已取消配置。"
-  fi
 }
 
 save_config() {
   install -d -m 700 "$CONFIG_DIR"
   cat >"$CONFIG_FILE" <<EOF
 NOWHERE_PORTAL=$(env_quote "$NOWHERE_PORTAL")
-NOWHERE_CLIENT_VALUE=$(env_quote "$NOWHERE_CLIENT")
 NOWHERE_VERSION_VALUE=$(env_quote "$NOWHERE_VERSION")
+NOWHERE_CLIENT_VALUE=$(env_quote "$NOWHERE_CLIENT")
 NOWHERE_PUBLIC_HOST_VALUE=$(env_quote "$NOWHERE_PUBLIC_HOST")
 NOWHERE_LISTEN_HOST_VALUE=$(env_quote "$NOWHERE_LISTEN_HOST")
-NOWHERE_PORT_VALUE=$(env_quote "$NOWHERE_PORT")
-NOWHERE_TCP_PORT_VALUE=$(env_quote "${NOWHERE_TCP_PORT:-}")
-NOWHERE_UDP_PORT_VALUE=$(env_quote "${NOWHERE_UDP_PORT:-}")
 NOWHERE_KEY_VALUE=$(env_quote "$NOWHERE_KEY")
-NOWHERE_NET_VALUE=$(env_quote "$NOWHERE_NET")
-NOWHERE_ALPN_VALUE=$(env_quote "$NOWHERE_ALPN")
+NOWHERE_TCP_CARRIER_VALUE=$(env_quote "$NOWHERE_TCP_CARRIER")
+NOWHERE_TCP_PORT_VALUE=$(env_quote "$NOWHERE_TCP_PORT")
+NOWHERE_UDP_CARRIER_VALUE=$(env_quote "$NOWHERE_UDP_CARRIER")
+NOWHERE_UDP_PORT_VALUE=$(env_quote "$NOWHERE_UDP_PORT")
 NOWHERE_TLS_VALUE=$(env_quote "$NOWHERE_TLS")
 NOWHERE_CRT_VALUE=$(env_quote "$NOWHERE_CRT")
 NOWHERE_TLS_KEY_VALUE=$(env_quote "$NOWHERE_TLS_KEY")
+NOWHERE_MORPH_VALUE=$(env_quote "$NOWHERE_MORPH")
 NOWHERE_RATE_VALUE=$(env_quote "$NOWHERE_RATE")
 NOWHERE_ETAR_VALUE=$(env_quote "$NOWHERE_ETAR")
 NOWHERE_DIAL_VALUE=$(env_quote "$NOWHERE_DIAL")
 NOWHERE_SOCKS_VALUE=$(env_quote "$NOWHERE_SOCKS")
-NOWHERE_LOG_VALUE=$(env_quote "$NOWHERE_LOG")
-NOWHERE_TELEMETRY_INTERVAL_VALUE=$(env_quote "$NOWHERE_TELEMETRY_INTERVAL")
-NOW_TELEMETRY_INTERVAL=$(env_quote "$NOWHERE_TELEMETRY_INTERVAL")
+NOWHERE_NEXT_VALUE=$(env_quote "$NOWHERE_NEXT")
+NOWHERE_NEXT_UP_VALUE=$(env_quote "$NOWHERE_NEXT_UP")
+NOWHERE_NEXT_DOWN_VALUE=$(env_quote "$NOWHERE_NEXT_DOWN")
+NOWHERE_NEXT_MUX_VALUE=$(env_quote "$NOWHERE_NEXT_MUX")
+NOWHERE_NEXT_SNI_VALUE=$(env_quote "$NOWHERE_NEXT_SNI")
+NOWHERE_NEXT_PIN_VALUE=$(env_quote "$NOWHERE_NEXT_PIN")
+NOWHERE_VECTOR_UP_VALUE=$(env_quote "$NOWHERE_VECTOR_UP")
+NOWHERE_VECTOR_DOWN_VALUE=$(env_quote "$NOWHERE_VECTOR_DOWN")
+NOWHERE_VECTOR_MUX_VALUE=$(env_quote "$NOWHERE_VECTOR_MUX")
 NOWHERE_VECTOR_SOCKS_VALUE=$(env_quote "$NOWHERE_VECTOR_SOCKS")
 NOWHERE_VECTOR_SNI_VALUE=$(env_quote "$NOWHERE_VECTOR_SNI")
 NOWHERE_VECTOR_PIN_VALUE=$(env_quote "$NOWHERE_VECTOR_PIN")
-NOWHERE_VECTOR_MUX_VALUE=$(env_quote "$NOWHERE_VECTOR_MUX")
+NOWHERE_VECTOR_RATE_VALUE=$(env_quote "$NOWHERE_VECTOR_RATE")
+NOWHERE_VECTOR_ETAR_VALUE=$(env_quote "$NOWHERE_VECTOR_ETAR")
+NOWHERE_VECTOR_LOG_VALUE=$(env_quote "$NOWHERE_VECTOR_LOG")
+NOWHERE_LOG_VALUE=$(env_quote "$NOWHERE_LOG")
+NOWHERE_TRANSPORT_MEMORY_PROFILE_VALUE=$(env_quote "$NOWHERE_TRANSPORT_MEMORY_PROFILE")
+NOW_TRANSPORT_MEMORY_PROFILE=$(env_quote "$NOWHERE_TRANSPORT_MEMORY_PROFILE")
+NOWHERE_MIX_FALLBACK_TIMEOUT_VALUE=$(env_quote "$NOWHERE_MIX_FALLBACK_TIMEOUT")
+NOW_MIX_FALLBACK_TIMEOUT=$(env_quote "$NOWHERE_MIX_FALLBACK_TIMEOUT")
+NOWHERE_TELEMETRY_INTERVAL_VALUE=$(env_quote "$NOWHERE_TELEMETRY_INTERVAL")
+NOW_TELEMETRY_INTERVAL=$(env_quote "$NOWHERE_TELEMETRY_INTERVAL")
 EOF
-  if version_is_v2 "$NOWHERE_VERSION"; then
-    printf 'NOWHERE_MORPH_VALUE=%s\n' "$(env_quote "$NOWHERE_MORPH")" >>"$CONFIG_FILE"
-    printf 'NOWHERE_TRANSPORT_MEMORY_PROFILE_VALUE=%s\n' "$(env_quote "$NOWHERE_TRANSPORT_MEMORY_PROFILE")" >>"$CONFIG_FILE"
-    printf 'NOW_TRANSPORT_MEMORY_PROFILE=%s\n' "$(env_quote "$NOWHERE_TRANSPORT_MEMORY_PROFILE")" >>"$CONFIG_FILE"
-    if [[ "$NOWHERE_MIX_FALLBACK_TIMEOUT" != "none" ]]; then
-      printf 'NOWHERE_MIX_FALLBACK_TIMEOUT_VALUE=%s\n' "$(env_quote "$NOWHERE_MIX_FALLBACK_TIMEOUT")" >>"$CONFIG_FILE"
-      printf 'NOW_MIX_FALLBACK_TIMEOUT=%s\n' "$(env_quote "$NOWHERE_MIX_FALLBACK_TIMEOUT")" >>"$CONFIG_FILE"
-    fi
-  elif version_uses_mux "$NOWHERE_VERSION"; then
-    printf 'NOWHERE_QUIC_MEMORY_PROFILE_VALUE=%s\n' "$(env_quote "$NOWHERE_QUIC_MEMORY_PROFILE")" >>"$CONFIG_FILE"
-    printf 'NOW_QUIC_MEMORY_PROFILE=%s\n' "$(env_quote "$NOWHERE_QUIC_MEMORY_PROFILE")" >>"$CONFIG_FILE"
-  fi
-  if ! version_uses_mux "$NOWHERE_VERSION"; then
-    printf 'NOWHERE_POOL_VALUE=%s\n' "$(env_quote "$NOWHERE_POOL")" >>"$CONFIG_FILE"
-  fi
   chmod 600 "$CONFIG_FILE"
-  info "Config saved to ${CONFIG_FILE}"
 }
 
 detect_asset() {
-  local arch libc
-  case "$(uname -m)" in
-    x86_64|amd64) arch="x86_64" ;;
-    aarch64|arm64) arch="aarch64" ;;
-    *) die "Unsupported architecture: $(uname -m)" ;;
-  esac
-  libc="gnu"
-  if command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; then
-    libc="musl"
-  fi
+  local arch libc=gnu
+  case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; aarch64|arm64) arch=aarch64 ;; *) die "Unsupported architecture: $(uname -m)" ;; esac
+  command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl && libc=musl
   printf 'nowhere-%s-unknown-linux-%s.tar.gz' "$arch" "$libc"
 }
-
 install_binary() {
-  command -v curl >/dev/null 2>&1 || die "curl is required to download Nowhere."
-  command -v tar >/dev/null 2>&1 || die "tar is required."
-
-  local version="${1:-${NOWHERE_VERSION:-}}"
-  local asset url tmpdir binary
-  validate_release_version "$version" || die "An exact release version such as v1.8.0 is required."
-  asset="$(detect_asset)"
-  url="https://github.com/${REPO}/releases/download/${version}/${asset}"
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf "${tmpdir:-}"' RETURN
-
-  info "Downloading ${asset} from ${REPO} ${version}..."
-  curl -fL --retry 3 --connect-timeout 10 -o "${tmpdir}/${asset}" "$url"
-  tar -xzf "${tmpdir}/${asset}" -C "$tmpdir"
-  binary="$(find "$tmpdir" -type f -name nowhere -perm -u+x | head -n 1)"
-  if [[ -z "$binary" ]]; then
-    binary="$(find "$tmpdir" -type f -name nowhere | head -n 1)"
-  fi
-  [[ -n "$binary" ]] || die "Could not find nowhere binary in release archive."
-  install -m 755 "$binary" "$BIN_PATH"
-  rm -rf "$tmpdir"
-  trap - RETURN
-  info "Installed ${BIN_PATH} (${version})"
+  local version="$1" asset url tmpdir binary
+  require_supported_version "$version"; command -v curl >/dev/null 2>&1 || die "curl is required."; command -v tar >/dev/null 2>&1 || die "tar is required."
+  asset="$(detect_asset)"; url="https://github.com/${REPO}/releases/download/${version}/${asset}"; tmpdir="$(mktemp -d)"; trap 'rm -rf "${tmpdir:-}"' RETURN
+  info "Downloading ${asset} from ${REPO} ${version}..."; curl -fL --retry 3 --connect-timeout 10 -o "${tmpdir}/${asset}" "$url"; tar -xzf "${tmpdir}/${asset}" -C "$tmpdir"
+  binary="$(find "$tmpdir" -type f -name nowhere -perm -u+x | head -n 1)"; [[ -n "$binary" ]] || binary="$(find "$tmpdir" -type f -name nowhere | head -n 1)"; [[ -n "$binary" ]] || die "Nowhere binary not found in release archive."
+  install -m 755 "$binary" "$BIN_PATH"; rm -rf "$tmpdir"; trap - RETURN
 }
-
 write_service() {
   cat >"$SERVICE_FILE" <<EOF
 [Unit]
@@ -1200,506 +437,111 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
-  info "systemd service written to ${SERVICE_FILE}"
 }
+service_cmd() { require_root; require_systemd; systemctl "$1" "$SERVICE_NAME"; }
 
-service_cmd() {
-  require_root
-  require_systemd
-  systemctl "$1" "$SERVICE_NAME"
+install_qrencode() {
+  command -v qrencode >/dev/null 2>&1 && return 0
+  if command -v apt-get >/dev/null 2>&1; then DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qrencode
+  elif command -v dnf >/dev/null 2>&1; then dnf install -y qrencode
+  elif command -v yum >/dev/null 2>&1; then yum install -y qrencode
+  elif command -v apk >/dev/null 2>&1; then apk add --no-cache qrencode
+  else warn "qrencode is unavailable; QR output skipped."; return 1; fi
 }
-
-start_service() {
-  service_cmd start
-  print_tls_fingerprint
-}
-
-restart_service() {
-  service_cmd restart
-  print_tls_fingerprint
-}
-
-open_tui() {
-  require_root
-  [[ -x "$BIN_PATH" ]] || die "Nowhere is not installed at ${BIN_PATH}."
-  [[ -t 0 && -t 1 ]] || die "The Nowhere TUI requires an interactive terminal."
-  load_config
-  local version="${NOWHERE_VERSION_VALUE:-}"
-  [[ -n "$version" ]] || die "No installed version is recorded in ${CONFIG_FILE}."
-  version_at_least "$version" 1 6 0 || die "The Terminal UI requires Nowhere v1.6.0 or newer; installed: ${version}."
-  "$BIN_PATH" tui
-}
+print_qr_code() { [[ -n "$1" ]] || return; install_qrencode || return; echo; echo "QR code (Anywhere nowhere:// link):"; qrencode -t ANSIUTF8 -m 1 -s 1 "$1" || warn "QR rendering failed."; }
 
 print_links() {
-  require_root
-  load_config
-  [[ -n "${NOWHERE_KEY_VALUE:-}" ]] || die "No config found. Run install or configure first."
-
-  local client version host host_part encoded_key encoded_name base udp_link tcp_link tcp_udp_link udp_tcp_link qr_link
-  local import_udp import_tcp import_tcp_udp import_udp_tcp
-  if [[ -n "${NOWHERE_CLIENT_VALUE:-}" ]]; then
-    client="$(normalize_client "$NOWHERE_CLIENT_VALUE")" || client="$DEFAULT_CLIENT"
-  else
-    client="$DEFAULT_CLIENT"
+  require_root; load_config; [[ -n "${NOWHERE_KEY_VALUE:-}" ]] || die "No configuration found."
+  local host endpoint anywhere_endpoint key name base tcp_link udp_link vector_link qr_link=""
+  host="${NOWHERE_PUBLIC_HOST_VALUE:-}"; [[ -n "$host" ]] || die "Public host is empty. Reconfigure the service."
+  host="$(format_host_for_url "$host")"; endpoint="$(build_endpoint "$host" "$NOWHERE_TCP_CARRIER_VALUE" "$NOWHERE_TCP_PORT_VALUE" "$NOWHERE_UDP_CARRIER_VALUE" "$NOWHERE_UDP_PORT_VALUE")"; anywhere_endpoint="$(build_endpoint "$host" "$(carrier_without_family "$NOWHERE_TCP_CARRIER_VALUE")" "$NOWHERE_TCP_PORT_VALUE" "$(carrier_without_family "$NOWHERE_UDP_CARRIER_VALUE")" "$NOWHERE_UDP_PORT_VALUE")"; key="$(urlencode "$NOWHERE_KEY_VALUE")"; name="$(urlencode "Nowhere VPS")"
+  echo; echo "Client output: $(client_label "$NOWHERE_CLIENT_VALUE")"; echo "Release: ${NOWHERE_VERSION_VALUE}"; echo; echo "Portal URL:"; echo "  ${NOWHERE_PORTAL}"; echo
+  if [[ "$NOWHERE_CLIENT_VALUE" == vector || "$NOWHERE_CLIENT_VALUE" == both ]]; then
+    vector_link="vector://${key}@${endpoint}?$(build_vector_query)"; echo "Native Vector URL:"; echo "  ${vector_link}"; echo; echo "Client command:"; echo "  nowhere '${vector_link}'"; [[ "$NOWHERE_CLIENT_VALUE" == both ]] && echo
   fi
-  version="${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}"
-  require_supported_version "$version"
-  host="${NOWHERE_PUBLIC_HOST_VALUE:-}"
-  [[ -n "$host" ]] || host="$(detect_public_host)"
-  [[ -n "$host" ]] || die "Public host is empty. Re-run configure with --public-host."
-  host_part="$(format_host_for_url "$host")"
-  encoded_key="$(urlencode "$NOWHERE_KEY_VALUE")"
-
-  echo
-  echo "Client output: $(client_label "$client")"
-  echo "Release: ${version}"
-  echo
-  echo "Portal URL:"
-  echo "  ${NOWHERE_PORTAL:-}"
-  echo
-
-  if version_is_v2 "$version"; then
-    print_v2_links "$client" "$host_part" "$encoded_key"
-    return
-  fi
-
-  if [[ "$client" == "vector" || "$client" == "both" ]]; then
-    base="vector://${encoded_key}@${host_part}:${NOWHERE_PORT_VALUE}"
-    udp_link="${base}?$(build_vector_query udp udp)"
-    tcp_link="${base}?$(build_vector_query tcp tcp)"
-    tcp_udp_link="${base}?$(build_vector_query tcp udp)"
-    udp_tcp_link="${base}?$(build_vector_query udp tcp)"
-
-    if [[ "${NOWHERE_NET_VALUE:-mix}" == "tcp" ]]; then
-      echo "Native Vector URL (TLS/TCP):"
-      echo "  ${tcp_link}"
-      echo
-      echo "Client command:"
-      echo "  nowhere '${tcp_link}'"
-    elif [[ "${NOWHERE_NET_VALUE:-mix}" == "udp" ]]; then
-      echo "Native Vector URL (QUIC/UDP):"
-      echo "  ${udp_link}"
-      echo
-      echo "Client command:"
-      echo "  nowhere '${udp_link}'"
-    else
-      echo "Native Vector URL (QUIC/UDP):"
-      echo "  ${udp_link}"
-      echo
-      echo "Native Vector URL (TLS/TCP):"
-      echo "  ${tcp_link}"
-      echo
-      echo "Native Vector URLs (split carriers):"
-      echo "  up=tcp/down=udp: ${tcp_udp_link}"
-      echo "  up=udp/down=tcp: ${udp_tcp_link}"
-      echo
-      echo "Run one URL on a v1.5+ client, for example:"
-      echo "  nowhere '${udp_link}'"
-    fi
-    [[ "$client" == "both" ]] && echo
-  fi
-
-  if [[ "$client" == "anywhere" || "$client" == "both" ]]; then
-    encoded_name="$(urlencode "Nowhere VPS")"
-    base="nowhere://${encoded_key}@${host_part}:${NOWHERE_PORT_VALUE}"
-    udp_link="${base}?$(build_anywhere_client_query udp udp)#${encoded_name}"
-    tcp_link="${base}?$(build_anywhere_client_query tcp tcp)#${encoded_name}"
-    import_udp="anywhere://add-proxy?link=$(urlencode "$udp_link")"
-    import_tcp="anywhere://add-proxy?link=$(urlencode "$tcp_link")"
-
-    tcp_udp_link="${base}?$(build_anywhere_client_query tcp udp)#${encoded_name}"
-    udp_tcp_link="${base}?$(build_anywhere_client_query udp tcp)#${encoded_name}"
-    import_tcp_udp="anywhere://add-proxy?link=$(urlencode "$tcp_udp_link")"
-    import_udp_tcp="anywhere://add-proxy?link=$(urlencode "$udp_tcp_link")"
-
-    if [[ "${NOWHERE_NET_VALUE:-mix}" == "tcp" ]]; then
-      qr_link="$tcp_link"
-      echo "Anywhere import link (TLS/TCP):"
-      echo "  ${tcp_link}"
-      echo
-      echo "Anywhere deep link:"
-      echo "  ${import_tcp}"
-    elif [[ "${NOWHERE_NET_VALUE:-mix}" == "udp" ]]; then
-      qr_link="$udp_link"
-      echo "Anywhere import link (QUIC/UDP):"
-      echo "  ${udp_link}"
-      echo
-      echo "Anywhere deep link:"
-      echo "  ${import_udp}"
-    else
-      qr_link="$udp_link"
-      echo "Anywhere import link (QUIC/UDP recommended):"
-      echo "  ${udp_link}"
-      echo
-      echo "Anywhere import link (TLS/TCP fallback):"
-      echo "  ${tcp_link}"
-      if [[ -z "${NOWHERE_SOCKS_VALUE:-}" || "${NOWHERE_SOCKS_VALUE}" == "$DEFAULT_SOCKS" ]]; then
-        echo
-        echo "Anywhere import links (split carriers):"
-        echo "  up=tcp/down=udp: ${tcp_udp_link}"
-        echo "  up=udp/down=tcp: ${udp_tcp_link}"
-      fi
-      echo
-      echo "Anywhere deep link (QUIC/UDP):"
-      echo "  ${import_udp}"
-      echo
-      echo "Anywhere deep link (TLS/TCP):"
-      echo "  ${import_tcp}"
-      if [[ -z "${NOWHERE_SOCKS_VALUE:-}" || "${NOWHERE_SOCKS_VALUE}" == "$DEFAULT_SOCKS" ]]; then
-        echo
-        echo "Anywhere deep links (split carriers):"
-        echo "  up=tcp/down=udp: ${import_tcp_udp}"
-        echo "  up=udp/down=tcp: ${import_udp_tcp}"
-      fi
+  if [[ "$NOWHERE_CLIENT_VALUE" == anywhere || "$NOWHERE_CLIENT_VALUE" == both ]]; then
+    base="nowhere://${key}@${anywhere_endpoint}"
+    if [[ "$NOWHERE_TCP_CARRIER_VALUE" != none ]]; then tcp_link="${base}?$(build_anywhere_query tcp tcp)#${name}"; qr_link="$tcp_link"; echo "Anywhere import link (TLS/TCP):"; echo "  ${tcp_link}"; fi
+    if [[ "$NOWHERE_UDP_CARRIER_VALUE" != none ]]; then udp_link="${base}?$(build_anywhere_query udp udp)#${name}"; [[ -n "$tcp_link" ]] && echo; [[ -n "$qr_link" ]] || qr_link="$udp_link"; echo "Anywhere import link (QUIC/UDP):"; echo "  ${udp_link}"; fi
+    print_qr_code "$qr_link"
+    if [[ "$endpoint" != "$anywhere_endpoint" ]]; then
+      echo "Note: Anywhere links omit tcp4/tcp6/udp4/udp6 suffixes; Native Vector retains them."
     fi
   fi
-
-  print_qr_code "${qr_link:-}" "Anywhere nowhere:// link"
-
-  echo
-  echo "Firewall reminder:"
-  if [[ "${NOWHERE_NET_VALUE:-mix}" == "tcp" ]]; then
-    echo "  Open TCP ${NOWHERE_PORT_VALUE}"
-  elif [[ "${NOWHERE_NET_VALUE:-mix}" == "udp" ]]; then
-    echo "  Open UDP ${NOWHERE_PORT_VALUE}"
-  else
-    echo "  Open TCP ${NOWHERE_PORT_VALUE} and UDP ${NOWHERE_PORT_VALUE}"
-  fi
-  if [[ "${NOWHERE_TLS_VALUE:-1}" == "1" ]]; then
-    echo
-    echo "TLS note:"
-    if [[ "$client" == "vector" ]]; then
-      echo "  Native Vector uses sni=none to disable verification for tls=1; it does not accept an Anywhere fingerprint."
-    elif [[ "$client" == "both" ]]; then
-      echo "  Anywhere can trust the current SHA-256; Native Vector uses sni=none unless configured otherwise."
-    else
-      echo "  tls=1 uses an ephemeral self-signed certificate. Trust the current SHA-256 in Anywhere or use tls=2."
-    fi
-  fi
-  if [[ -n "${NOWHERE_SOCKS_VALUE:-}" && "${NOWHERE_SOCKS_VALUE}" != "$DEFAULT_SOCKS" ]]; then
-    echo
-    echo "Outbound SOCKS5:"
-    echo "  $(display_socks "$NOWHERE_SOCKS_VALUE")"
-  fi
+  echo; echo "Firewall reminder:"; [[ "$NOWHERE_TCP_CARRIER_VALUE" == none ]] || echo "  Open TCP ${NOWHERE_TCP_PORT_VALUE}"; [[ "$NOWHERE_UDP_CARRIER_VALUE" == none ]] || echo "  Open UDP ${NOWHERE_UDP_PORT_VALUE}"
 }
 
-print_v2_links() {
-  local client="$1" host_part="$2" encoded_key="$3"
-  local endpoint base encoded_name tcp_link udp_link qr_link=""
-  endpoint="$(build_endpoint "$host_part" "${NOWHERE_TCP_PORT_VALUE:-}" "${NOWHERE_UDP_PORT_VALUE:-}")"
-  encoded_name="$(urlencode "Nowhere VPS")"
-
-  if [[ "$client" == "vector" || "$client" == "both" ]]; then
-    base="vector://${encoded_key}@${endpoint}"
-    if [[ -n "${NOWHERE_TCP_PORT_VALUE:-}" ]]; then
-      tcp_link="${base}?$(build_vector_query tcp tcp)"
-      echo "Native Vector URL (V2 TLS/TCP):"
-      echo "  ${tcp_link}"
-    fi
-    if [[ -n "${NOWHERE_UDP_PORT_VALUE:-}" ]]; then
-      udp_link="${base}?$(build_vector_query udp udp)"
-      [[ -n "${tcp_link:-}" ]] && echo
-      echo "Native Vector URL (V2 QUIC/UDP):"
-      echo "  ${udp_link}"
-    fi
-    echo
-    echo "Run one URL on a V2 client, for example:"
-    echo "  nowhere '${tcp_link:-$udp_link}'"
-    [[ "$client" == "both" ]] && echo
-  fi
-
-  if [[ "$client" == "anywhere" || "$client" == "both" ]]; then
-    base="nowhere://${encoded_key}@${endpoint}"
-    if [[ -n "${NOWHERE_TCP_PORT_VALUE:-}" ]]; then
-      tcp_link="${base}?$(build_anywhere_client_query tcp tcp)#${encoded_name}"
-      qr_link="$tcp_link"
-      echo "Anywhere TF import link (V2 TLS/TCP):"
-      echo "  ${tcp_link}"
-    fi
-    if [[ -n "${NOWHERE_UDP_PORT_VALUE:-}" ]]; then
-      udp_link="${base}?$(build_anywhere_client_query udp udp)#${encoded_name}"
-      [[ -n "${tcp_link:-}" ]] && echo
-      [[ -n "$qr_link" ]] || qr_link="$udp_link"
-      echo "Anywhere TF import link (V2 QUIC/UDP):"
-      echo "  ${udp_link}"
-    fi
-  fi
-
-  print_qr_code "$qr_link" "Anywhere TF nowhere:// link"
-  echo
-  echo "Firewall reminder:"
-  [[ -z "${NOWHERE_TCP_PORT_VALUE:-}" ]] || echo "  Open TCP ${NOWHERE_TCP_PORT_VALUE}"
-  [[ -z "${NOWHERE_UDP_PORT_VALUE:-}" ]] || echo "  Open UDP ${NOWHERE_UDP_PORT_VALUE}"
-  if [[ "${NOWHERE_TLS_VALUE:-1}" == "1" ]]; then
-    echo
-    echo "TLS note:"
-    echo "  tls=1 uses an ephemeral self-signed certificate. The SHA-256 changes after every restart."
-  fi
+local_tls_probe_host() { local host="${NOWHERE_LISTEN_HOST_VALUE:-}"; [[ -z "$host" || "$host" == '*' || "$host" == 0.0.0.0 || "$host" == :: ]] && printf 127.0.0.1 || strip_brackets "$host"; }
+print_tls_fingerprint() {
+  require_root; load_config
+  [[ "${NOWHERE_TLS_VALUE:-1}" == 1 ]] || { echo "tls=2 uses the supplied certificate; no self-signed fingerprint is needed."; return; }
+  [[ "${NOWHERE_TCP_CARRIER_VALUE:-none}" != none ]] || { warn "Fingerprint probing needs a TCP carrier."; return 1; }
+  command -v openssl >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 || { warn "openssl and timeout are required."; return 1; }
+  local fingerprint output host; host="$(local_tls_probe_host)"
+  for _ in 1 2 3 4 5; do output="$(timeout 8 openssl s_client -connect "${host}:${NOWHERE_TCP_PORT_VALUE}" -servername "${NOWHERE_PUBLIC_HOST_VALUE:-localhost}" -showcerts </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null || true)"; fingerprint="${output#*=}"; [[ -n "$fingerprint" && "$fingerprint" != "$output" ]] && { echo "Self-signed certificate SHA-256:"; echo "  ${fingerprint}"; return; }; sleep 1; done
+  warn "Fingerprint unavailable. Check: journalctl -u ${SERVICE_NAME} -n 100 --no-pager"
 }
 
-install_all() {
-  require_root
-  require_systemd
-  configure_values
-  install_binary "$NOWHERE_VERSION"
-  save_config
-  write_service
-  systemctl enable --now "$SERVICE_NAME"
-  info "Nowhere service enabled and started."
-  print_links
-  print_tls_fingerprint
+fetch_recent_releases() { curl -fsSL -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${REPO}/releases?per_page=10" | sed -nE 's/^[[:space:]]*"tag_name":[[:space:]]*"([^"]+)".*/\1/p'; }
+choose_release_version() {
+  local releases=() item index choice
+  while IFS= read -r item; do validate_release_version "$item" && releases+=("$item"); done < <(fetch_recent_releases)
+  [[ ${#releases[@]} -gt 0 ]] || die "No supported release found on GitHub."
+  echo; echo "Recent supported Nowhere releases:"; for index in "${!releases[@]}"; do printf ' %2d) %s\n' "$((index + 1))" "${releases[$index]}"; done; echo "  0) Cancel"
+  while true; do read -r -p "Choose a version: " choice; [[ "$choice" == 0 ]] && return 1; [[ "$choice" =~ ^[0-9]+$ ]] && (( 10#$choice >= 1 && 10#$choice <= ${#releases[@]} )) && { SELECTED_VERSION="${releases[$((10#$choice - 1))]}"; return; }; warn "Enter 0..${#releases[@]}."; done
 }
 
-install_vector_all() {
-  NOWHERE_CLIENT="vector"
-  if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
-    NOWHERE_VERSION="$DEFAULT_VECTOR_VERSION"
-  fi
-  install_all
-}
-
-install_anywhere_all() {
-  NOWHERE_CLIENT="anywhere"
-  if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
-    NOWHERE_VERSION="$DEFAULT_MODERN_VERSION"
-  fi
-  install_all
-}
-
-install_v2_all() {
-  NOWHERE_CLIENT="${NOWHERE_CLIENT:-anywhere}"
-  if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
-    NOWHERE_VERSION="$DEFAULT_V2_VERSION"
-  fi
-  version_is_v2 "$NOWHERE_VERSION" || die "install-v2 requires a V2 release."
-  install_all
-}
-
-install_default_all() {
-  NOWHERE_CLIENT="$(normalize_client "${NOWHERE_CLIENT:-$DEFAULT_CLIENT}")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
-  if [[ "$VERSION_EXPLICIT" -eq 0 ]]; then
-    NOWHERE_VERSION="$DEFAULT_MODERN_VERSION"
-  fi
-  install_all
-}
-
-quick_install_anywhere_all() {
-  ASSUME_YES=1 install_anywhere_all
-}
-
-configure_all() {
-  require_root
-  require_systemd
-  load_config
-  NOWHERE_VERSION="${NOWHERE_VERSION_VALUE:-$DEFAULT_MODERN_VERSION}"
-  require_supported_version "$NOWHERE_VERSION"
-  configure_values
-  save_config
-  write_service
-  if systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then
-    systemctl restart "$SERVICE_NAME"
-    info "Nowhere service restarted."
-    print_tls_fingerprint
-  else
-    warn "Service is configured but not enabled. Run: systemctl enable --now ${SERVICE_NAME}"
-  fi
-  print_links
-}
-
-backup_v1_config() {
-  local backup timestamp
-  timestamp="$(date +%Y%m%d%H%M%S)"
-  backup="${CONFIG_FILE}.v1.${timestamp}"
-  cp -p "$CONFIG_FILE" "$backup"
-  printf '%s' "$backup"
-}
-
-upgrade_v1_to_v2_all() {
-  require_root
-  require_systemd
-  load_config
-  [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No existing installation config found. Run install first."
-  version_is_v2 "$NOWHERE_VERSION_VALUE" && die "The current installation is already V2. Use configure to change it."
-
-  local previous_version backup
-  previous_version="$NOWHERE_VERSION_VALUE"
-  warn "V2 wire protocol is incompatible with V1. Existing V1 client links will stop working after migration."
-  confirm_default_yes "停止当前 V1 服务并切换到 V2 吗？" || {
-    info "已取消 V1 到 V2 的迁移。"
-    return 0
-  }
-
-  NOWHERE_VERSION="$DEFAULT_V2_VERSION"
-  NOWHERE_CLIENT="${NOWHERE_CLIENT_VALUE:-$DEFAULT_CLIENT}"
-  NOWHERE_PORT="${NOWHERE_PORT_VALUE:-$DEFAULT_PORT}"
-  NOWHERE_KEY="${NOWHERE_KEY_VALUE:-}"
-  NOWHERE_PUBLIC_HOST="${NOWHERE_PUBLIC_HOST_VALUE:-}"
-  NOWHERE_LISTEN_HOST="${NOWHERE_LISTEN_HOST_VALUE:-}"
-  NOWHERE_NET="${NOWHERE_NET_VALUE:-$DEFAULT_NET}"
-  NOWHERE_TCP_PORT=""
-  NOWHERE_UDP_PORT=""
-  NOWHERE_MORPH="$DEFAULT_MORPH"
-  NOWHERE_TRANSPORT_MEMORY_PROFILE="$DEFAULT_TRANSPORT_MEMORY_PROFILE"
-  NOWHERE_MIX_FALLBACK_TIMEOUT="$DEFAULT_MIX_FALLBACK_TIMEOUT"
-  configure_values
-
-  # Download first: a failed download must not interrupt the working V1 service.
-  install_binary "$NOWHERE_VERSION"
-  backup="$(backup_v1_config)"
-  info "V1 configuration backed up to ${backup}"
-  if systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1; then
-    systemctl stop "$SERVICE_NAME"
-    info "V1 service stopped. Applying V2 configuration..."
-  fi
-  save_config
-  write_service
-  systemctl enable --now "$SERVICE_NAME"
-  info "Nowhere service migrated from ${previous_version} to ${NOWHERE_VERSION}."
-  print_links
-  print_tls_fingerprint
-}
-
-update_saved_version() {
-  local version="$1"
-  local replacement tmp
-  replacement="NOWHERE_VERSION_VALUE=$(env_quote "$version")"
-  tmp="$(mktemp "${CONFIG_FILE}.tmp.XXXXXX")"
-  awk -v replacement="$replacement" '
-    BEGIN { updated = 0 }
-    /^NOWHERE_VERSION_VALUE=/ { print replacement; updated = 1; next }
-    { print }
-    END { if (!updated) print replacement }
-  ' "$CONFIG_FILE" >"$tmp"
-  chmod 600 "$tmp"
-  mv -f "$tmp" "$CONFIG_FILE"
-}
-
-update_all() {
-  require_root
-  require_systemd
-  load_config
-  [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No existing installation config found. Run install first."
-
-  local selected
-  require_supported_version "$NOWHERE_VERSION_VALUE"
-  if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then
-    selected="$NOWHERE_VERSION"
-    validate_release_version "$selected" || die "Invalid release version: ${selected}"
-  else
-    if ! choose_release_version; then
-      info "已取消二进制更新。"
-      return 0
-    fi
-    selected="$SELECTED_VERSION"
-  fi
-  require_supported_version "$selected"
-  if [[ "$(version_major "$NOWHERE_VERSION_VALUE")" != "$(version_major "$selected")" ]]; then
-    die "Cross-major updates require a full migration. Use the V1-to-V2 menu entry or install a release again."
-  fi
-
-  install_binary "$selected"
-  update_saved_version "$selected"
-  if systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1; then
-    systemctl restart "$SERVICE_NAME"
-    info "Nowhere binary updated from ${NOWHERE_VERSION_VALUE} to ${selected}; service restarted."
-  else
-    info "Nowhere binary updated from ${NOWHERE_VERSION_VALUE} to ${selected}; service is not running."
-  fi
-  print_links
-  print_tls_fingerprint
-}
-
-install_selected_release() {
-  require_root
-  require_systemd
-  if ! choose_release_version; then
-    info "已取消版本选择。"
-    return 0
-  fi
-  NOWHERE_VERSION="$SELECTED_VERSION"
-  echo
-  info "已选择 ${NOWHERE_VERSION}。"
-  install_all
-}
-
-uninstall_all() {
-  require_root
-  require_systemd
-  systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
-  rm -f "$SERVICE_FILE" "$BIN_PATH"
-  systemctl daemon-reload
-  warn "Kept ${CONFIG_DIR} so you do not lose keys. Remove it manually if you really want to wipe the config."
-}
+install_all() { require_root; require_systemd; configure_values; install_binary "$NOWHERE_VERSION"; save_config; write_service; systemctl enable --now "$SERVICE_NAME"; info "Nowhere service enabled and started."; print_links; print_tls_fingerprint || true; }
+install_default() { NOWHERE_CLIENT="${NOWHERE_CLIENT:-$DEFAULT_CLIENT}"; [[ "$VERSION_EXPLICIT" -eq 1 ]] || NOWHERE_VERSION="$DEFAULT_VERSION"; install_all; }
+install_vector() { NOWHERE_CLIENT=vector; [[ "$VERSION_EXPLICIT" -eq 1 ]] || NOWHERE_VERSION="$DEFAULT_VERSION"; install_all; }
+quick_install() { ASSUME_YES=1 install_default; }
+configure_all() { require_root; require_systemd; load_config; NOWHERE_VERSION="${NOWHERE_VERSION_VALUE:-$DEFAULT_VERSION}"; configure_values; save_config; write_service; systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; print_links; print_tls_fingerprint || true; }
+update_saved_version() { sed -i.bak "s/^NOWHERE_VERSION_VALUE=.*/NOWHERE_VERSION_VALUE=$(env_quote "$1")/" "$CONFIG_FILE"; rm -f "${CONFIG_FILE}.bak"; }
+update_all() { require_root; require_systemd; load_config; [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No installation config found."; local selected; if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then selected="$NOWHERE_VERSION"; else choose_release_version || return; selected="$SELECTED_VERSION"; fi; require_supported_version "$selected"; install_binary "$selected"; update_saved_version "$selected"; systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; info "Nowhere updated to ${selected}."; print_links; print_tls_fingerprint || true; }
+open_tui() { require_root; [[ -x "$BIN_PATH" ]] || die "Nowhere is not installed."; [[ -t 0 && -t 1 ]] || die "The TUI requires an interactive terminal."; "$BIN_PATH" tui; }
+uninstall_all() { require_root; require_systemd; systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true; rm -f "$SERVICE_FILE" "$BIN_PATH"; systemctl daemon-reload; warn "Kept ${CONFIG_DIR} to preserve configuration and keys."; }
 
 menu() {
-  require_root
-  require_systemd
+  require_root; require_systemd
   while true; do
-    cat <<EOF
+    cat <<'EOF'
 
 ==============================
- Nowhere VPS 管理脚本
+ Nowhere VPS Manager
 ==============================
-  1) 安装/重装（稳定版 Anywhere）
-  2) 安装/重装（V2 / Anywhere TF）
-  3) 从 V1 升级至 V2
-  4) 安装/重装（Native Vector）
-  5) 快速默认安装（稳定版 Anywhere）
-  6) 修改配置（向导）
-  7) 指定 Release 安装/重装
-  8) 更新 Nowhere 二进制（仅同一大版本）
-  9) 启动服务
- 10) 停止服务
- 11) 重启服务
- 12) 查看状态
- 13) 打开 Terminal UI（只读监控）
- 14) 查看日志
- 15) 打印客户端链接/命令
- 16) 查看 tls=1 自签证书 SHA-256
- 17) 卸载服务
-  0) 退出
+  1) Install/Reinstall (Anywhere)
+  2) Install/Reinstall (Native Vector)
+  3) Quick default install (Anywhere)
+  4) Reconfigure
+  5) Select a Release and install
+  6) Update Nowhere binary
+  7) Start service
+  8) Stop service
+  9) Restart service
+ 10) Show status
+ 11) Open Terminal UI
+ 12) Follow logs
+ 13) Print client links / QR code
+ 14) Show tls=1 certificate SHA-256
+ 15) Uninstall
+  0) Exit
 EOF
-    read -r -p "请输入数字: " choice
-    case "$choice" in
-      1) install_anywhere_all ;;
-      2) install_v2_all ;;
-      3) upgrade_v1_to_v2_all ;;
-      4) install_vector_all ;;
-      5) quick_install_anywhere_all ;;
-      6) configure_all ;;
-      7) install_selected_release ;;
-      8) update_all ;;
-      9) start_service ;;
-      10) service_cmd stop ;;
-      11) restart_service ;;
-      12) service_cmd status ;;
-      13) open_tui ;;
-      14) journalctl -u "$SERVICE_NAME" -f ;;
-      15) print_links ;;
-      16) print_tls_fingerprint ;;
-      17) uninstall_all ;;
-      0) exit 0 ;;
-      *) warn "未知选项：${choice}" ;;
-    esac
+    read -r -p "Choose: " choice
+    case "$choice" in 1) install_default ;; 2) install_vector ;; 3) quick_install ;; 4) configure_all ;; 5) choose_release_version && { NOWHERE_VERSION="$SELECTED_VERSION"; install_all; } ;; 6) update_all ;; 7) service_cmd start ;; 8) service_cmd stop ;; 9) service_cmd restart ;; 10) service_cmd status ;; 11) open_tui ;; 12) journalctl -u "$SERVICE_NAME" -f ;; 13) print_links ;; 14) print_tls_fingerprint || true ;; 15) uninstall_all ;; 0) exit 0 ;; *) warn "Unknown option: ${choice}" ;; esac
   done
 }
 
 case "$ACTION" in
-  install) install_default_all ;;
-  install-anywhere|anywhere) install_anywhere_all ;;
-  install-v2|v2) install_v2_all ;;
-  upgrade-v1-to-v2|upgrade) upgrade_v1_to_v2_all ;;
-  install-vector|vector) install_vector_all ;;
+  install|install-anywhere|anywhere) install_default ;;
+  install-vector|vector) install_vector ;;
   configure|config) configure_all ;;
   update) update_all ;;
-  versions|version|releases|release) install_selected_release ;;
-  start) start_service ;;
-  restart) restart_service ;;
-  stop|status) service_cmd "$ACTION" ;;
+  versions|version|releases|release) choose_release_version && { NOWHERE_VERSION="$SELECTED_VERSION"; install_all; } ;;
+  start|stop|restart|status) service_cmd "$ACTION" ;;
   tui|dashboard|monitor) open_tui ;;
-  fingerprint|sha256|sha-256) print_tls_fingerprint ;;
   logs|log) require_root; journalctl -u "$SERVICE_NAME" -f ;;
   link|links) print_links ;;
+  fingerprint|sha256|sha-256) print_tls_fingerprint ;;
   uninstall|remove) uninstall_all ;;
   menu) menu ;;
   help|-h|--help) usage ;;
