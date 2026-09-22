@@ -2,6 +2,9 @@
 set -euo pipefail
 
 REPO="NodePassProject/Nowhere"
+SCRIPT_RAW_URL="https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh"
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+if command -v readlink >/dev/null 2>&1; then SCRIPT_PATH="$(readlink -f "$SCRIPT_PATH" 2>/dev/null || printf '%s' "$SCRIPT_PATH")"; fi
 SERVICE_NAME="nowhere"
 BIN_PATH="/usr/local/bin/nowhere"
 CONFIG_DIR="/etc/nowhere"
@@ -35,6 +38,7 @@ ACTION="${1:-menu}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -y|--yes) ASSUME_YES=1; shift ;;
+    --lang) NOWHERE_LANG="${2:?missing --lang value}"; shift 2 ;;
     --version) NOWHERE_VERSION="${2:?missing --version value}"; VERSION_EXPLICIT=1; shift 2 ;;
     --client) NOWHERE_CLIENT="${2:?missing --client value}"; shift 2 ;;
     --key) NOWHERE_KEY="${2:?missing --key value}"; shift 2 ;;
@@ -92,6 +96,7 @@ Usage:
   sudo bash nowhere-vps.sh install-vector [--yes] [options]
   sudo bash nowhere-vps.sh configure [options]
   sudo bash nowhere-vps.sh update [--version v2.1.0]
+  sudo bash nowhere-vps.sh update-script
   sudo bash nowhere-vps.sh versions
   sudo bash nowhere-vps.sh start|stop|restart|status|tui|logs|link|fingerprint|uninstall
 
@@ -99,6 +104,7 @@ This script supports Nowhere releases v2.0.0 and later. Press Enter in the wizar
 
 Options:
   --client anywhere|vector|both
+  --lang zh|en                    Wizard and menu language
   --version v2.1.0
   --key secret
   --public-host host              Client-facing domain or IP
@@ -132,6 +138,29 @@ require_systemd() {
   [[ -d /run/systemd/system ]] || warn "systemd does not appear to be running; service commands may fail."
 }
 load_config() { [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE" || true; }
+validate_language() { [[ "$1" == zh || "$1" == en ]]; }
+default_language() {
+  case "${LC_ALL:-${LANG:-}}" in zh_*|zh.*) printf zh ;; *) printf en ;; esac
+}
+is_chinese() { [[ "$NOWHERE_LANG" == zh ]]; }
+resolve_language() {
+  if [[ -n "${NOWHERE_LANG:-}" ]]; then validate_language "$NOWHERE_LANG" || die "NOWHERE_LANG must be zh or en."; return; fi
+  if [[ -n "${NOWHERE_LANG_VALUE:-}" ]]; then NOWHERE_LANG="$NOWHERE_LANG_VALUE"; validate_language "$NOWHERE_LANG" || die "Saved language must be zh or en."; return; fi
+  if [[ "$ASSUME_YES" -eq 1 || ! -t 0 ]]; then NOWHERE_LANG="$(default_language)"; return; fi
+  local choice
+  echo
+  echo "Language / 语言："
+  echo "  1) English"
+  echo "  2) 简体中文"
+  while true; do
+    read -r -p "Choose / 请选择 [1]: " choice
+    case "${choice:-1}" in 1) NOWHERE_LANG=en; return ;; 2) NOWHERE_LANG=zh; return ;; *) warn "Enter 1 or 2 / 请输入 1 或 2。" ;; esac
+  done
+}
+prompt_value() {
+  local english="$1" chinese="$2" default="$3"
+  if is_chinese; then read_value "$chinese" "$default"; else read_value "$english" "$default"; fi
+}
 
 env_quote() {
   local value="${1//$'\n'/}"
@@ -260,6 +289,7 @@ validate_config() {
   [[ "$NOWHERE_UDP_CARRIER" == none ]] || validate_port "$NOWHERE_UDP_PORT" || die "Invalid UDP port."
   [[ "$NOWHERE_TLS" == 1 || "$NOWHERE_TLS" == 2 ]] || die "NOWHERE_TLS must be 1 or 2."
   validate_bool "$NOWHERE_MORPH" || die "NOWHERE_MORPH must be 0 or 1."
+  validate_language "$NOWHERE_LANG" || die "NOWHERE_LANG must be zh or en."
   validate_morph_tcp_prelude "$NOWHERE_MORPH_TCP_PRELUDE" || die "NOWHERE_MORPH_TCP_PRELUDE must be low7 or full8."
   validate_nonnegative_int "$NOWHERE_RATE" && validate_nonnegative_int "$NOWHERE_ETAR" || die "Rate limits must be non-negative integers."
   validate_socks "$NOWHERE_SOCKS" || die "Invalid NOWHERE_SOCKS value."
@@ -340,6 +370,7 @@ build_anywhere_query() {
 configure_values() {
   load_config
   local generated_key detected_host default_tls path
+  resolve_language
   generated_key="$(random_token)"; detected_host="$(detect_public_host)"
   NOWHERE_VERSION="${NOWHERE_VERSION:-${NOWHERE_VERSION_VALUE:-$DEFAULT_VERSION}}"
   require_supported_version "$NOWHERE_VERSION"
@@ -369,22 +400,22 @@ configure_values() {
   NOWHERE_TELEMETRY_INTERVAL="${NOWHERE_TELEMETRY_INTERVAL:-${NOWHERE_TELEMETRY_INTERVAL_VALUE:-${NOW_TELEMETRY_INTERVAL:-$DEFAULT_TELEMETRY_INTERVAL}}}"
 
   if [[ "$ASSUME_YES" -eq 0 ]]; then
-    info "Nowhere configuration wizard. Press Enter to keep defaults."
-    NOWHERE_CLIENT="$(read_value "Client output anywhere/vector/both" "$NOWHERE_CLIENT")"
-    NOWHERE_PUBLIC_HOST="$(read_value "Public domain/IP" "$NOWHERE_PUBLIC_HOST")"; NOWHERE_LISTEN_HOST="$(read_value "Listen host, empty means wildcard" "$NOWHERE_LISTEN_HOST")"
-    NOWHERE_TCP_CARRIER="$(read_value "TCP carrier tcp/tcp4/tcp6/none" "$NOWHERE_TCP_CARRIER")"
-    [[ "$NOWHERE_TCP_CARRIER" == none ]] || NOWHERE_TCP_PORT="$(read_value "TCP port" "$NOWHERE_TCP_PORT")"
-    NOWHERE_UDP_CARRIER="$(read_value "UDP carrier udp/udp4/udp6/none" "$NOWHERE_UDP_CARRIER")"
-    [[ "$NOWHERE_UDP_CARRIER" == none ]] || NOWHERE_UDP_PORT="$(read_value "UDP port" "$NOWHERE_UDP_PORT")"
-    NOWHERE_KEY="$(read_value "Shared Key" "$NOWHERE_KEY")"; NOWHERE_TLS="$(read_value "TLS 1=self-signed, 2=PEM" "$NOWHERE_TLS")"
-    if [[ "$NOWHERE_TLS" == 2 ]]; then NOWHERE_CRT="$(read_value "Certificate chain absolute path" "$NOWHERE_CRT")"; NOWHERE_TLS_KEY="$(read_value "Private key absolute path" "$NOWHERE_TLS_KEY")"; fi
-    NOWHERE_MORPH="$(read_value "Morph 0=off, 1=ChaCha20 transform" "$NOWHERE_MORPH")"
-    [[ "$NOWHERE_MORPH" != 1 ]] || NOWHERE_MORPH_TCP_PRELUDE="$(read_value "TCP Morph prelude low7/full8 (native next only)" "$NOWHERE_MORPH_TCP_PRELUDE")"
-    NOWHERE_RATE="$(read_value "Rate Mbps, 0=unlimited" "$NOWHERE_RATE")"; NOWHERE_ETAR="$(read_value "Etar Mbps, 0=unlimited" "$NOWHERE_ETAR")"
-    NOWHERE_DIAL="$(read_value "Outbound source IP, auto=system default" "$NOWHERE_DIAL")"; path="$(read_value "Outbound path direct/socks/next" "$([[ "$NOWHERE_NEXT" != none ]] && printf next || [[ "$NOWHERE_SOCKS" != none ]] && printf socks || printf direct)")"
-    case "$path" in direct) NOWHERE_SOCKS=none; NOWHERE_NEXT=none ;; socks) NOWHERE_NEXT=none; NOWHERE_SOCKS="$(read_value "Outbound SOCKS5" "$NOWHERE_SOCKS")" ;; next) NOWHERE_SOCKS=none; NOWHERE_NEXT="$(read_value "Next key@endpoint" "$NOWHERE_NEXT")"; NOWHERE_NEXT_UP="$(read_value "Next up tcp/udp/mix" "$NOWHERE_NEXT_UP")"; NOWHERE_NEXT_DOWN="$(read_value "Next down tcp/udp/mix" "$NOWHERE_NEXT_DOWN")"; NOWHERE_NEXT_MUX="$(read_value "Next Mux 0/1" "$NOWHERE_NEXT_MUX")"; NOWHERE_NEXT_SNI="$(read_value "Next SNI/none" "$NOWHERE_NEXT_SNI")"; NOWHERE_NEXT_PIN="$(read_value "Next certificate pin/none" "$NOWHERE_NEXT_PIN")" ;; *) die "Outbound path must be direct, socks, or next." ;; esac
-    NOWHERE_LOG="$(read_value "Log level" "$NOWHERE_LOG")"; NOWHERE_TRANSPORT_MEMORY_PROFILE="$(read_value "Transport memory memory/balanced/throughput" "$NOWHERE_TRANSPORT_MEMORY_PROFILE")"; NOWHERE_MIX_FALLBACK_TIMEOUT="$(read_value "Mix fallback timeout" "$NOWHERE_MIX_FALLBACK_TIMEOUT")"; NOWHERE_TELEMETRY_INTERVAL="$(read_value "TUI telemetry interval" "$NOWHERE_TELEMETRY_INTERVAL")"
-    if [[ "$NOWHERE_CLIENT" == vector || "$NOWHERE_CLIENT" == both ]]; then NOWHERE_VECTOR_UP="$(read_value "Vector up tcp/udp/mix" "$NOWHERE_VECTOR_UP")"; NOWHERE_VECTOR_DOWN="$(read_value "Vector down tcp/udp/mix" "$NOWHERE_VECTOR_DOWN")"; NOWHERE_VECTOR_MUX="$(read_value "Vector Mux 0/1" "$NOWHERE_VECTOR_MUX")"; NOWHERE_VECTOR_SOCKS="$(read_value "Vector local SOCKS5" "$NOWHERE_VECTOR_SOCKS")"; NOWHERE_VECTOR_SNI="$(read_value "Vector SNI/none" "$NOWHERE_VECTOR_SNI")"; NOWHERE_VECTOR_PIN="$(read_value "Vector certificate pin/none" "$NOWHERE_VECTOR_PIN")"; NOWHERE_VECTOR_RATE="$(read_value "Vector rate Mbps, 0=unlimited" "$NOWHERE_VECTOR_RATE")"; NOWHERE_VECTOR_ETAR="$(read_value "Vector etar Mbps, 0=unlimited" "$NOWHERE_VECTOR_ETAR")"; NOWHERE_VECTOR_LOG="$(read_value "Vector log level" "$NOWHERE_VECTOR_LOG")"; fi
+    is_chinese && info "Nowhere 配置向导。直接回车保留默认值。" || info "Nowhere configuration wizard. Press Enter to keep defaults."
+    NOWHERE_CLIENT="$(prompt_value "Client output anywhere/vector/both" "客户端输出 anywhere/vector/both" "$NOWHERE_CLIENT")"
+    NOWHERE_PUBLIC_HOST="$(prompt_value "Public domain/IP" "公网域名或 IP" "$NOWHERE_PUBLIC_HOST")"; NOWHERE_LISTEN_HOST="$(prompt_value "Listen host, empty means wildcard" "监听地址，留空监听全部地址" "$NOWHERE_LISTEN_HOST")"
+    NOWHERE_TCP_CARRIER="$(prompt_value "TCP carrier tcp/tcp4/tcp6/none" "TCP 载体 tcp/tcp4/tcp6/none" "$NOWHERE_TCP_CARRIER")"
+    [[ "$NOWHERE_TCP_CARRIER" == none ]] || NOWHERE_TCP_PORT="$(prompt_value "TCP port" "TCP 端口" "$NOWHERE_TCP_PORT")"
+    NOWHERE_UDP_CARRIER="$(prompt_value "UDP carrier udp/udp4/udp6/none" "UDP 载体 udp/udp4/udp6/none" "$NOWHERE_UDP_CARRIER")"
+    [[ "$NOWHERE_UDP_CARRIER" == none ]] || NOWHERE_UDP_PORT="$(prompt_value "UDP port" "UDP 端口" "$NOWHERE_UDP_PORT")"
+    NOWHERE_KEY="$(prompt_value "Shared Key" "共享密钥" "$NOWHERE_KEY")"; NOWHERE_TLS="$(prompt_value "TLS 1=self-signed, 2=PEM" "TLS 1=自签证书，2=PEM 证书" "$NOWHERE_TLS")"
+    if [[ "$NOWHERE_TLS" == 2 ]]; then NOWHERE_CRT="$(prompt_value "Certificate chain absolute path" "证书链绝对路径" "$NOWHERE_CRT")"; NOWHERE_TLS_KEY="$(prompt_value "Private key absolute path" "私钥绝对路径" "$NOWHERE_TLS_KEY")"; fi
+    NOWHERE_MORPH="$(prompt_value "Morph 0=off, 1=ChaCha20 transform" "Morph 0=关闭，1=ChaCha20 变换" "$NOWHERE_MORPH")"
+    [[ "$NOWHERE_MORPH" != 1 ]] || NOWHERE_MORPH_TCP_PRELUDE="$(prompt_value "TCP Morph prelude low7/full8 (native next only)" "TCP Morph 前导 low7/full8（仅原生 next）" "$NOWHERE_MORPH_TCP_PRELUDE")"
+    NOWHERE_RATE="$(prompt_value "Rate Mbps, 0=unlimited" "限速 Mbps，0=不限速" "$NOWHERE_RATE")"; NOWHERE_ETAR="$(prompt_value "Etar Mbps, 0=unlimited" "Etar Mbps，0=不限速" "$NOWHERE_ETAR")"
+    NOWHERE_DIAL="$(prompt_value "Outbound source IP, auto=system default" "出站源 IP，auto=系统默认" "$NOWHERE_DIAL")"; path="$(prompt_value "Outbound path direct/socks/next" "出站路径 direct/socks/next" "$([[ "$NOWHERE_NEXT" != none ]] && printf next || [[ "$NOWHERE_SOCKS" != none ]] && printf socks || printf direct)")"
+    case "$path" in direct) NOWHERE_SOCKS=none; NOWHERE_NEXT=none ;; socks) NOWHERE_NEXT=none; NOWHERE_SOCKS="$(prompt_value "Outbound SOCKS5" "出站 SOCKS5" "$NOWHERE_SOCKS")" ;; next) NOWHERE_SOCKS=none; NOWHERE_NEXT="$(prompt_value "Next key@endpoint" "下一跳 key@endpoint" "$NOWHERE_NEXT")"; NOWHERE_NEXT_UP="$(prompt_value "Next up tcp/udp/mix" "下一跳上行 tcp/udp/mix" "$NOWHERE_NEXT_UP")"; NOWHERE_NEXT_DOWN="$(prompt_value "Next down tcp/udp/mix" "下一跳下行 tcp/udp/mix" "$NOWHERE_NEXT_DOWN")"; NOWHERE_NEXT_MUX="$(prompt_value "Next Mux 0/1" "下一跳 Mux 0/1" "$NOWHERE_NEXT_MUX")"; NOWHERE_NEXT_SNI="$(prompt_value "Next SNI/none" "下一跳 SNI/none" "$NOWHERE_NEXT_SNI")"; NOWHERE_NEXT_PIN="$(prompt_value "Next certificate pin/none" "下一跳证书 Pin/none" "$NOWHERE_NEXT_PIN")" ;; *) die "Outbound path must be direct, socks, or next." ;; esac
+    NOWHERE_LOG="$(prompt_value "Log level" "日志级别" "$NOWHERE_LOG")"; NOWHERE_TRANSPORT_MEMORY_PROFILE="$(prompt_value "Transport memory memory/balanced/throughput" "传输内存 memory/balanced/throughput" "$NOWHERE_TRANSPORT_MEMORY_PROFILE")"; NOWHERE_MIX_FALLBACK_TIMEOUT="$(prompt_value "Mix fallback timeout" "Mix 回退超时" "$NOWHERE_MIX_FALLBACK_TIMEOUT")"; NOWHERE_TELEMETRY_INTERVAL="$(prompt_value "TUI telemetry interval" "TUI 遥测间隔" "$NOWHERE_TELEMETRY_INTERVAL")"
+    if [[ "$NOWHERE_CLIENT" == vector || "$NOWHERE_CLIENT" == both ]]; then NOWHERE_VECTOR_UP="$(prompt_value "Vector up tcp/udp/mix" "Vector 上行 tcp/udp/mix" "$NOWHERE_VECTOR_UP")"; NOWHERE_VECTOR_DOWN="$(prompt_value "Vector down tcp/udp/mix" "Vector 下行 tcp/udp/mix" "$NOWHERE_VECTOR_DOWN")"; NOWHERE_VECTOR_MUX="$(prompt_value "Vector Mux 0/1" "Vector Mux 0/1" "$NOWHERE_VECTOR_MUX")"; NOWHERE_VECTOR_SOCKS="$(prompt_value "Vector local SOCKS5" "Vector 本地 SOCKS5" "$NOWHERE_VECTOR_SOCKS")"; NOWHERE_VECTOR_SNI="$(prompt_value "Vector SNI/none" "Vector SNI/none" "$NOWHERE_VECTOR_SNI")"; NOWHERE_VECTOR_PIN="$(prompt_value "Vector certificate pin/none" "Vector 证书 Pin/none" "$NOWHERE_VECTOR_PIN")"; NOWHERE_VECTOR_RATE="$(prompt_value "Vector rate Mbps, 0=unlimited" "Vector 限速 Mbps，0=不限速" "$NOWHERE_VECTOR_RATE")"; NOWHERE_VECTOR_ETAR="$(prompt_value "Vector etar Mbps, 0=unlimited" "Vector Etar Mbps，0=不限速" "$NOWHERE_VECTOR_ETAR")"; NOWHERE_VECTOR_LOG="$(prompt_value "Vector log level" "Vector 日志级别" "$NOWHERE_VECTOR_LOG")"; fi
   fi
   validate_config
   NOWHERE_PORTAL="$(build_portal_url)"
@@ -394,6 +425,7 @@ save_config() {
   install -d -m 700 "$CONFIG_DIR"
   cat >"$CONFIG_FILE" <<EOF
 NOWHERE_PORTAL=$(env_quote "$NOWHERE_PORTAL")
+NOWHERE_LANG_VALUE=$(env_quote "$NOWHERE_LANG")
 NOWHERE_VERSION_VALUE=$(env_quote "$NOWHERE_VERSION")
 NOWHERE_CLIENT_VALUE=$(env_quote "$NOWHERE_CLIENT")
 NOWHERE_PUBLIC_HOST_VALUE=$(env_quote "$NOWHERE_PUBLIC_HOST")
@@ -538,8 +570,16 @@ choose_release_version() {
   local releases=() item index choice
   while IFS= read -r item; do validate_release_version "$item" && releases+=("$item"); done < <(fetch_recent_releases)
   [[ ${#releases[@]} -gt 0 ]] || die "No supported release found on GitHub."
-  echo; echo "Recent supported Nowhere releases:"; for index in "${!releases[@]}"; do printf ' %2d) %s\n' "$((index + 1))" "${releases[$index]}"; done; echo "  0) Cancel"
-  while true; do read -r -p "Choose a version: " choice; [[ "$choice" == 0 ]] && return 1; [[ "$choice" =~ ^[0-9]+$ ]] && (( 10#$choice >= 1 && 10#$choice <= ${#releases[@]} )) && { SELECTED_VERSION="${releases[$((10#$choice - 1))]}"; return; }; warn "Enter 0..${#releases[@]}."; done
+  echo
+  is_chinese && echo "最近的受支持 Nowhere Release：" || echo "Recent supported Nowhere releases:"
+  for index in "${!releases[@]}"; do printf ' %2d) %s\n' "$((index + 1))" "${releases[$index]}"; done
+  is_chinese && echo "  0) 取消" || echo "  0) Cancel"
+  while true; do
+    if is_chinese; then read -r -p "请选择版本: " choice; else read -r -p "Choose a version: " choice; fi
+    [[ "$choice" == 0 ]] && return 1
+    [[ "$choice" =~ ^[0-9]+$ ]] && (( 10#$choice >= 1 && 10#$choice <= ${#releases[@]} )) && { SELECTED_VERSION="${releases[$((10#$choice - 1))]}"; return; }
+    is_chinese && warn "请输入 0..${#releases[@]}。" || warn "Enter 0..${#releases[@]}."
+  done
 }
 
 install_all() { require_root; require_systemd; configure_values; install_binary "$NOWHERE_VERSION"; save_config; write_service; systemctl enable --now "$SERVICE_NAME"; info "Nowhere service enabled and started."; print_links; print_tls_fingerprint || true; }
@@ -548,14 +588,65 @@ install_vector() { NOWHERE_CLIENT=vector; [[ "$VERSION_EXPLICIT" -eq 1 ]] || NOW
 quick_install() { ASSUME_YES=1 install_default; }
 configure_all() { require_root; require_systemd; load_config; NOWHERE_VERSION="${NOWHERE_VERSION_VALUE:-$DEFAULT_VERSION}"; configure_values; save_config; write_service; systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; print_links; print_tls_fingerprint || true; }
 update_saved_version() { sed -i.bak "s/^NOWHERE_VERSION_VALUE=.*/NOWHERE_VERSION_VALUE=$(env_quote "$1")/" "$CONFIG_FILE"; rm -f "${CONFIG_FILE}.bak"; }
+update_saved_language() {
+  [[ -f "$CONFIG_FILE" ]] || return
+  if grep -q '^NOWHERE_LANG_VALUE=' "$CONFIG_FILE"; then
+    sed -i.bak "s/^NOWHERE_LANG_VALUE=.*/NOWHERE_LANG_VALUE=$(env_quote "$NOWHERE_LANG")/" "$CONFIG_FILE"
+    rm -f "${CONFIG_FILE}.bak"
+  else
+    printf '\nNOWHERE_LANG_VALUE=%s\n' "$(env_quote "$NOWHERE_LANG")" >>"$CONFIG_FILE"
+  fi
+}
+change_language() { NOWHERE_LANG=""; NOWHERE_LANG_VALUE=""; resolve_language; update_saved_language; }
 update_all() { require_root; require_systemd; load_config; [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No installation config found."; local selected; if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then selected="$NOWHERE_VERSION"; else choose_release_version || return; selected="$SELECTED_VERSION"; fi; require_supported_version "$selected"; confirm_morph_upgrade "$NOWHERE_VERSION_VALUE" "$selected" || return; install_binary "$selected"; update_saved_version "$selected"; systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; info "Nowhere updated to ${selected}."; print_links; print_tls_fingerprint || true; }
+update_script() {
+  local tmp backup mode
+  [[ -f "$SCRIPT_PATH" ]] || die "Cannot update a script run from a pipe. Download it to a file first."
+  [[ -w "$SCRIPT_PATH" ]] || die "Current script is not writable: ${SCRIPT_PATH}. Run with sudo or fix permissions."
+  command -v curl >/dev/null 2>&1 || die "curl is required to update the script."
+  tmp="$(mktemp "${SCRIPT_PATH}.new.XXXXXX")"; trap 'rm -f "${tmp:-}"' RETURN
+  is_chinese && info "正在下载最新脚本..." || info "Downloading the latest script..."
+  curl -fsSL --retry 3 --connect-timeout 10 -o "$tmp" "$SCRIPT_RAW_URL"
+  bash -n "$tmp" || die "Downloaded script failed syntax validation; current script was kept."
+  if cmp -s "$tmp" "$SCRIPT_PATH"; then is_chinese && info "当前已是最新脚本。" || info "The deployment script is already up to date."; rm -f "$tmp"; trap - RETURN; return; fi
+  mode="$(stat -c '%a' "$SCRIPT_PATH" 2>/dev/null || printf 755)"
+  backup="${SCRIPT_PATH}.bak.$(date +%Y%m%d%H%M%S)"
+  cp -p "$SCRIPT_PATH" "$backup"
+  mv "$tmp" "$SCRIPT_PATH"; chmod "$mode" "$SCRIPT_PATH"; trap - RETURN
+  is_chinese && info "脚本已更新，备份文件：${backup}" || info "Script updated. Backup: ${backup}"
+}
 open_tui() { require_root; [[ -x "$BIN_PATH" ]] || die "Nowhere is not installed."; [[ -t 0 && -t 1 ]] || die "The TUI requires an interactive terminal."; "$BIN_PATH" tui; }
 uninstall_all() { require_root; require_systemd; systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true; rm -f "$SERVICE_FILE" "$BIN_PATH"; systemctl daemon-reload; warn "Kept ${CONFIG_DIR} to preserve configuration and keys."; }
 
 menu() {
   require_root; require_systemd
+  load_config; resolve_language; update_saved_language
   while true; do
-    cat <<'EOF'
+    if is_chinese; then cat <<'EOF'
+
+==============================
+ Nowhere VPS 管理脚本
+==============================
+  1) 安装/重装（Anywhere）
+  2) 安装/重装（原生 Vector）
+  3) 快速默认安装（Anywhere）
+  4) 修改配置
+  5) 指定 Release 安装
+  6) 更新 Nowhere 二进制
+  7) 启动服务
+  8) 停止服务
+  9) 重启服务
+ 10) 查看状态
+ 11) 打开终端界面
+ 12) 查看实时日志
+ 13) 打印客户端链接 / 二维码
+ 14) 查看 tls=1 证书 SHA-256
+ 15) 卸载服务
+ 16) 切换语言
+ 17) 更新部署脚本
+  0) 退出
+EOF
+    else cat <<'EOF'
 
 ==============================
  Nowhere VPS Manager
@@ -573,12 +664,15 @@ menu() {
  11) Open Terminal UI
  12) Follow logs
  13) Print client links / QR code
- 14) Show tls=1 certificate SHA-256
- 15) Uninstall
+14) Show tls=1 certificate SHA-256
+15) Uninstall
+ 16) Switch language
+ 17) Update deployment script
   0) Exit
 EOF
-    read -r -p "Choose: " choice
-    case "$choice" in 1) install_default ;; 2) install_vector ;; 3) quick_install ;; 4) configure_all ;; 5) choose_release_version && { NOWHERE_VERSION="$SELECTED_VERSION"; install_all; } ;; 6) update_all ;; 7) service_cmd start ;; 8) service_cmd stop ;; 9) service_cmd restart ;; 10) service_cmd status ;; 11) open_tui ;; 12) journalctl -u "$SERVICE_NAME" -f ;; 13) print_links ;; 14) print_tls_fingerprint || true ;; 15) uninstall_all ;; 0) exit 0 ;; *) warn "Unknown option: ${choice}" ;; esac
+    fi
+    if is_chinese; then read -r -p "请选择: " choice; else read -r -p "Choose: " choice; fi
+    case "$choice" in 1) install_default ;; 2) install_vector ;; 3) quick_install ;; 4) configure_all ;; 5) choose_release_version && { NOWHERE_VERSION="$SELECTED_VERSION"; install_all; } ;; 6) update_all ;; 7) service_cmd start ;; 8) service_cmd stop ;; 9) service_cmd restart ;; 10) service_cmd status ;; 11) open_tui ;; 12) journalctl -u "$SERVICE_NAME" -f ;; 13) print_links ;; 14) print_tls_fingerprint || true ;; 15) uninstall_all ;; 16) change_language ;; 17) update_script ;; 0) exit 0 ;; *) is_chinese && warn "未知选项: ${choice}" || warn "Unknown option: ${choice}" ;; esac
   done
 }
 
@@ -587,6 +681,7 @@ case "$ACTION" in
   install-vector|vector) install_vector ;;
   configure|config) configure_all ;;
   update) update_all ;;
+  update-script|script-update|self-update) update_script ;;
   versions|version|releases|release) choose_release_version && { NOWHERE_VERSION="$SELECTED_VERSION"; install_all; } ;;
   start|stop|restart|status) service_cmd "$ACTION" ;;
   tui|dashboard|monitor) open_tui ;;

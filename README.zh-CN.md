@@ -33,6 +33,9 @@ chmod +x nowhere-vps.sh
 sudo bash nowhere-vps.sh
 ```
 
+首次交互运行时可选择 English 或简体中文，选择会保存下来；之后可在菜单第 `16`
+项切换，也可用 `--lang en` 或 `--lang zh` 显式指定语言。
+
 默认安装会在 `2077` 同时启用无限制 TCP 和 UDP carrier，使用临时自签证书，
 并输出 Anywhere 链接。VPS 防火墙与云厂商安全组均需放行同一个 TCP、UDP 端口。
 
@@ -52,6 +55,8 @@ sudo bash nowhere-vps.sh
 13) 打印客户端链接 / 二维码
 14) 查看 tls=1 证书 SHA-256
 15) 卸载服务
+16) 切换语言
+17) 更新部署脚本
 ```
 
 非交互默认安装：
@@ -142,6 +147,7 @@ sudo NOWHERE_TLS=2 \
 sudo bash nowhere-vps.sh configure
 sudo bash nowhere-vps.sh versions
 sudo bash nowhere-vps.sh update
+sudo bash nowhere-vps.sh update-script
 sudo bash nowhere-vps.sh start
 sudo bash nowhere-vps.sh stop
 sudo bash nowhere-vps.sh restart

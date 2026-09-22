@@ -37,6 +37,10 @@ chmod +x nowhere-vps.sh
 sudo bash nowhere-vps.sh
 ```
 
+On the first interactive run, choose English or Simplified Chinese. The choice
+is saved and can later be changed from menu item `16`, or selected explicitly
+with `--lang en` or `--lang zh`.
+
 The default install enables both unrestricted TCP and UDP carriers on port
 `2077`, creates an ephemeral self-signed certificate, and prints Anywhere
 links. Open the same TCP and UDP port in both the VPS firewall and cloud security
@@ -58,6 +62,8 @@ group.
 13) Print client links / QR code
 14) Show tls=1 certificate SHA-256
 15) Uninstall
+16) Switch language
+17) Update deployment script
 ```
 
 For non-interactive defaults:
@@ -155,6 +161,7 @@ sudo NOWHERE_TLS=2 \
 sudo bash nowhere-vps.sh configure
 sudo bash nowhere-vps.sh versions
 sudo bash nowhere-vps.sh update
+sudo bash nowhere-vps.sh update-script
 sudo bash nowhere-vps.sh start
 sudo bash nowhere-vps.sh stop
 sudo bash nowhere-vps.sh restart
