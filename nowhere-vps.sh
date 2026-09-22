@@ -589,7 +589,7 @@ quick_install() { ASSUME_YES=1 install_default; }
 configure_all() { require_root; require_systemd; load_config; NOWHERE_VERSION="${NOWHERE_VERSION_VALUE:-$DEFAULT_VERSION}"; configure_values; save_config; write_service; systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; print_links; print_tls_fingerprint || true; }
 update_saved_version() { sed -i.bak "s/^NOWHERE_VERSION_VALUE=.*/NOWHERE_VERSION_VALUE=$(env_quote "$1")/" "$CONFIG_FILE"; rm -f "${CONFIG_FILE}.bak"; }
 update_saved_language() {
-  [[ -f "$CONFIG_FILE" ]] || return
+  [[ -f "$CONFIG_FILE" ]] || return 0
   if grep -q '^NOWHERE_LANG_VALUE=' "$CONFIG_FILE"; then
     sed -i.bak "s/^NOWHERE_LANG_VALUE=.*/NOWHERE_LANG_VALUE=$(env_quote "$NOWHERE_LANG")/" "$CONFIG_FILE"
     rm -f "${CONFIG_FILE}.bak"
