@@ -7,7 +7,7 @@
 
 ## 支持范围
 
-脚本默认安装 `v2.0.0`，支持 `v2.0.0` 及之后的当前 Release；指定版本列表会自动
+脚本默认安装 `v2.1.0`，支持 `v2.0.0` 及之后的当前 Release；指定版本列表会自动
 排除 V1。脚本输出 Anywhere 的 `nowhere://` 链接和 Native Vector 的 `vector://` URL。
 
 ## 功能
@@ -16,8 +16,8 @@
 - 下载指定受支持 Release，并通过一个 systemd Portal 服务管理。
 - 支持共享/独立 TCP、UDP 端口，TCP-only、UDP-only，以及
   `tcp4`、`tcp6`、`udp4`、`udp6` 地址族限制。
-- 支持 Portal TLS、`morph`、限速、出站 SOCKS5、原生 `next` Portal 链路、
-  Mux、SNI、证书 Pin、日志与传输环境参数。
+- 支持 Portal TLS、`morph`、TCP Morph 前导模式、限速、出站 SOCKS5、原生
+  `next` Portal 链路、Mux、SNI、证书 Pin、日志与传输环境参数。
 - 支持 Native Vector 固定路由或 `mix`、Mux、SNI、Pin、限速、日志和本地
   SOCKS5 监听。
 - 输出 Anywhere 的 TCP、UDP 导入链接，并为优先可用链路生成终端二维码。
@@ -88,6 +88,21 @@ Portal 可直连目标、经由出站 SOCKS5，或连接下一个原生 Portal�
 
 使用 `--next key@host:port` 或显式 carrier 端点配置下一跳 Portal；其路由和 TLS
 参数分别为 `--next-up`、`--next-down`、`--next-mux`、`--next-sni`、`--next-pin`。
+
+## Morph 与升级
+
+默认 `morph=0`。启用 `morph=1` 后，Nowhere `v2.1.0` 更改了 Morph 协议格式，
+无法与 `v2.0.x` 的 Morph 对端通信。因此，将已启用 Morph 的 Portal 从 `v2.0.x`
+升级到 `v2.1.0` 或更高版本前，需要同步升级受影响的 Anywhere 客户端、原生
+Vector 节点和原生 `next` 跳板。
+
+交互式更新在这个兼容性边界会要求输入 `UPGRADE` 才继续。非交互式自动化会被
+拒绝；只有已完成协同升级时，才应额外传入
+`--allow-morph-breaking-upgrade`。
+
+本机 Nowhere 进程主动发起的 TCP Morph 连接可用
+`--morph-tcp-prelude low7|full8` 选择前导模式，默认 `low7`，大多数场景无需
+调整。它影响原生 `next` 等出站连接，不会写入 Anywhere 导入链接。
 
 ## 客户端链接
 

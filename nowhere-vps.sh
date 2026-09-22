@@ -8,7 +8,7 @@ CONFIG_DIR="/etc/nowhere"
 CONFIG_FILE="${CONFIG_DIR}/nowhere.env"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-DEFAULT_VERSION="v2.0.0"
+DEFAULT_VERSION="v2.1.0"
 DEFAULT_PORT="2077"
 DEFAULT_TCP_CARRIER="tcp"
 DEFAULT_UDP_CARRIER="udp"
@@ -16,6 +16,7 @@ DEFAULT_CLIENT="anywhere"
 DEFAULT_TLS="1"
 DEFAULT_LOG="info"
 DEFAULT_MORPH="0"
+DEFAULT_MORPH_TCP_PRELUDE="low7"
 DEFAULT_MUX="0"
 DEFAULT_TRANSPORT_MEMORY_PROFILE="throughput"
 DEFAULT_MIX_FALLBACK_TIMEOUT="1s"
@@ -27,6 +28,7 @@ DEFAULT_TELEMETRY_INTERVAL="1s"
 
 ASSUME_YES=0
 VERSION_EXPLICIT=0
+ALLOW_MORPH_BREAKING_UPGRADE=0
 ACTION="${1:-menu}"
 [[ $# -eq 0 ]] || shift
 
@@ -46,6 +48,8 @@ while [[ $# -gt 0 ]]; do
     --crt|--cert) NOWHERE_CRT="${2:?missing --crt value}"; shift 2 ;;
     --tls-key) NOWHERE_TLS_KEY="${2:?missing --tls-key value}"; shift 2 ;;
     --morph) NOWHERE_MORPH="${2:?missing --morph value}"; shift 2 ;;
+    --morph-tcp-prelude) NOWHERE_MORPH_TCP_PRELUDE="${2:?missing --morph-tcp-prelude value}"; shift 2 ;;
+    --allow-morph-breaking-upgrade) ALLOW_MORPH_BREAKING_UPGRADE=1; shift ;;
     --rate) NOWHERE_RATE="${2:?missing --rate value}"; shift 2 ;;
     --etar) NOWHERE_ETAR="${2:?missing --etar value}"; shift 2 ;;
     --dial) NOWHERE_DIAL="${2:?missing --dial value}"; shift 2 ;;
@@ -87,7 +91,7 @@ Usage:
   sudo bash nowhere-vps.sh install [--yes] [options]
   sudo bash nowhere-vps.sh install-vector [--yes] [options]
   sudo bash nowhere-vps.sh configure [options]
-  sudo bash nowhere-vps.sh update [--version v2.0.0]
+  sudo bash nowhere-vps.sh update [--version v2.1.0]
   sudo bash nowhere-vps.sh versions
   sudo bash nowhere-vps.sh start|stop|restart|status|tui|logs|link|fingerprint|uninstall
 
@@ -95,7 +99,7 @@ This script supports Nowhere releases v2.0.0 and later. Press Enter in the wizar
 
 Options:
   --client anywhere|vector|both
-  --version v2.0.0
+  --version v2.1.0
   --key secret
   --public-host host              Client-facing domain or IP
   --listen-host host              Portal bind host; empty binds wildcard addresses
@@ -106,6 +110,8 @@ Options:
   --tls 1|2                       1=self-signed, 2=PEM certificate
   --crt /absolute/certificate.pem --tls-key /absolute/private.key
   --morph 0|1
+  --morph-tcp-prelude low7|full8    TCP Morph prelude for native next connections
+  --allow-morph-breaking-upgrade    Confirm a Morph upgrade from v2.0.x to v2.1+
   --rate 0 --etar 0 --dial auto --log info
   --socks none|[user:pass@]host:port
   --next key@host:port            Native Portal upstream; mutually exclusive with socks
@@ -213,6 +219,36 @@ validate_release_version() {
   (( 10#$major >= 2 ))
 }
 require_supported_version() { validate_release_version "$1" || die "Only Nowhere releases v2.0.0 and later are supported."; }
+validate_morph_tcp_prelude() { [[ "$1" == low7 || "$1" == full8 ]]; }
+version_at_least() {
+  local version="${1#v}" minimum="${2#v}" version_major version_minor version_patch minimum_major minimum_minor minimum_patch value threshold
+  version="${version%%-*}"; minimum="${minimum%%-*}"
+  IFS=. read -r version_major version_minor version_patch <<<"$version"
+  IFS=. read -r minimum_major minimum_minor minimum_patch <<<"$minimum"
+  for value in "$version_major:$minimum_major" "$version_minor:$minimum_minor" "$version_patch:$minimum_patch"; do
+    threshold="${value#*:}"; value="${value%%:*}"
+    (( 10#$value > 10#$threshold )) && return 0
+    (( 10#$value < 10#$threshold )) && return 1
+  done
+  return 0
+}
+is_morph_upgrade_boundary() {
+  [[ "${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}" == 1 ]] || return 1
+  version_at_least "$2" v2.1.0 && ! version_at_least "$1" v2.1.0
+}
+confirm_morph_upgrade() {
+  local current="$1" selected="$2" answer
+  is_morph_upgrade_boundary "$current" "$selected" || return 0
+  warn "Morph protocol changes in v2.1 are incompatible with v2.0.x Morph peers."
+  warn "Upgrade every client, native next hop, and Vector node using morph=1 before restarting this Portal."
+  if [[ "$ALLOW_MORPH_BREAKING_UPGRADE" -eq 1 ]]; then
+    warn "Proceeding because --allow-morph-breaking-upgrade was supplied."
+    return 0
+  fi
+  [[ -t 0 ]] || die "Refusing non-interactive Morph upgrade. Add --allow-morph-breaking-upgrade after coordinating peer upgrades."
+  read -r -p "Type UPGRADE to continue: " answer
+  [[ "$answer" == UPGRADE ]] || { warn "Update cancelled."; return 1; }
+}
 validate_config() {
   require_supported_version "$NOWHERE_VERSION"
   NOWHERE_CLIENT="$(normalize_client "$NOWHERE_CLIENT")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
@@ -224,6 +260,7 @@ validate_config() {
   [[ "$NOWHERE_UDP_CARRIER" == none ]] || validate_port "$NOWHERE_UDP_PORT" || die "Invalid UDP port."
   [[ "$NOWHERE_TLS" == 1 || "$NOWHERE_TLS" == 2 ]] || die "NOWHERE_TLS must be 1 or 2."
   validate_bool "$NOWHERE_MORPH" || die "NOWHERE_MORPH must be 0 or 1."
+  validate_morph_tcp_prelude "$NOWHERE_MORPH_TCP_PRELUDE" || die "NOWHERE_MORPH_TCP_PRELUDE must be low7 or full8."
   validate_nonnegative_int "$NOWHERE_RATE" && validate_nonnegative_int "$NOWHERE_ETAR" || die "Rate limits must be non-negative integers."
   validate_socks "$NOWHERE_SOCKS" || die "Invalid NOWHERE_SOCKS value."
   [[ "$NOWHERE_LOG" =~ ^(none|debug|info|warn|error|event)$ ]] || die "Invalid log level."
@@ -318,6 +355,7 @@ configure_values() {
   default_tls="$DEFAULT_TLS"; [[ -n "$NOWHERE_CRT$NOWHERE_TLS_KEY" ]] && default_tls=2
   NOWHERE_TLS="${NOWHERE_TLS:-${NOWHERE_TLS_VALUE:-$default_tls}}"
   NOWHERE_MORPH="${NOWHERE_MORPH:-${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}}"
+  NOWHERE_MORPH_TCP_PRELUDE="${NOWHERE_MORPH_TCP_PRELUDE:-${NOWHERE_MORPH_TCP_PRELUDE_VALUE:-${NOW_MORPH_TCP_PRELUDE:-$DEFAULT_MORPH_TCP_PRELUDE}}}"
   NOWHERE_RATE="${NOWHERE_RATE:-${NOWHERE_RATE_VALUE:-0}}"; NOWHERE_ETAR="${NOWHERE_ETAR:-${NOWHERE_ETAR_VALUE:-0}}"
   NOWHERE_DIAL="${NOWHERE_DIAL:-${NOWHERE_DIAL_VALUE:-auto}}"; NOWHERE_SOCKS="${NOWHERE_SOCKS:-${NOWHERE_SOCKS_VALUE:-$DEFAULT_SOCKS}}"
   NOWHERE_NEXT="${NOWHERE_NEXT:-${NOWHERE_NEXT_VALUE:-none}}"; NOWHERE_NEXT_UP="${NOWHERE_NEXT_UP:-${NOWHERE_NEXT_UP_VALUE:-tcp}}"; NOWHERE_NEXT_DOWN="${NOWHERE_NEXT_DOWN:-${NOWHERE_NEXT_DOWN_VALUE:-tcp}}"
@@ -340,7 +378,9 @@ configure_values() {
     [[ "$NOWHERE_UDP_CARRIER" == none ]] || NOWHERE_UDP_PORT="$(read_value "UDP port" "$NOWHERE_UDP_PORT")"
     NOWHERE_KEY="$(read_value "Shared Key" "$NOWHERE_KEY")"; NOWHERE_TLS="$(read_value "TLS 1=self-signed, 2=PEM" "$NOWHERE_TLS")"
     if [[ "$NOWHERE_TLS" == 2 ]]; then NOWHERE_CRT="$(read_value "Certificate chain absolute path" "$NOWHERE_CRT")"; NOWHERE_TLS_KEY="$(read_value "Private key absolute path" "$NOWHERE_TLS_KEY")"; fi
-    NOWHERE_MORPH="$(read_value "Morph 0=off, 1=ChaCha20 transform" "$NOWHERE_MORPH")"; NOWHERE_RATE="$(read_value "Rate Mbps, 0=unlimited" "$NOWHERE_RATE")"; NOWHERE_ETAR="$(read_value "Etar Mbps, 0=unlimited" "$NOWHERE_ETAR")"
+    NOWHERE_MORPH="$(read_value "Morph 0=off, 1=ChaCha20 transform" "$NOWHERE_MORPH")"
+    [[ "$NOWHERE_MORPH" != 1 ]] || NOWHERE_MORPH_TCP_PRELUDE="$(read_value "TCP Morph prelude low7/full8 (native next only)" "$NOWHERE_MORPH_TCP_PRELUDE")"
+    NOWHERE_RATE="$(read_value "Rate Mbps, 0=unlimited" "$NOWHERE_RATE")"; NOWHERE_ETAR="$(read_value "Etar Mbps, 0=unlimited" "$NOWHERE_ETAR")"
     NOWHERE_DIAL="$(read_value "Outbound source IP, auto=system default" "$NOWHERE_DIAL")"; path="$(read_value "Outbound path direct/socks/next" "$([[ "$NOWHERE_NEXT" != none ]] && printf next || [[ "$NOWHERE_SOCKS" != none ]] && printf socks || printf direct)")"
     case "$path" in direct) NOWHERE_SOCKS=none; NOWHERE_NEXT=none ;; socks) NOWHERE_NEXT=none; NOWHERE_SOCKS="$(read_value "Outbound SOCKS5" "$NOWHERE_SOCKS")" ;; next) NOWHERE_SOCKS=none; NOWHERE_NEXT="$(read_value "Next key@endpoint" "$NOWHERE_NEXT")"; NOWHERE_NEXT_UP="$(read_value "Next up tcp/udp/mix" "$NOWHERE_NEXT_UP")"; NOWHERE_NEXT_DOWN="$(read_value "Next down tcp/udp/mix" "$NOWHERE_NEXT_DOWN")"; NOWHERE_NEXT_MUX="$(read_value "Next Mux 0/1" "$NOWHERE_NEXT_MUX")"; NOWHERE_NEXT_SNI="$(read_value "Next SNI/none" "$NOWHERE_NEXT_SNI")"; NOWHERE_NEXT_PIN="$(read_value "Next certificate pin/none" "$NOWHERE_NEXT_PIN")" ;; *) die "Outbound path must be direct, socks, or next." ;; esac
     NOWHERE_LOG="$(read_value "Log level" "$NOWHERE_LOG")"; NOWHERE_TRANSPORT_MEMORY_PROFILE="$(read_value "Transport memory memory/balanced/throughput" "$NOWHERE_TRANSPORT_MEMORY_PROFILE")"; NOWHERE_MIX_FALLBACK_TIMEOUT="$(read_value "Mix fallback timeout" "$NOWHERE_MIX_FALLBACK_TIMEOUT")"; NOWHERE_TELEMETRY_INTERVAL="$(read_value "TUI telemetry interval" "$NOWHERE_TELEMETRY_INTERVAL")"
@@ -367,6 +407,8 @@ NOWHERE_TLS_VALUE=$(env_quote "$NOWHERE_TLS")
 NOWHERE_CRT_VALUE=$(env_quote "$NOWHERE_CRT")
 NOWHERE_TLS_KEY_VALUE=$(env_quote "$NOWHERE_TLS_KEY")
 NOWHERE_MORPH_VALUE=$(env_quote "$NOWHERE_MORPH")
+NOWHERE_MORPH_TCP_PRELUDE_VALUE=$(env_quote "$NOWHERE_MORPH_TCP_PRELUDE")
+NOW_MORPH_TCP_PRELUDE=$(env_quote "$NOWHERE_MORPH_TCP_PRELUDE")
 NOWHERE_RATE_VALUE=$(env_quote "$NOWHERE_RATE")
 NOWHERE_ETAR_VALUE=$(env_quote "$NOWHERE_ETAR")
 NOWHERE_DIAL_VALUE=$(env_quote "$NOWHERE_DIAL")
@@ -472,13 +514,22 @@ print_links() {
 }
 
 local_tls_probe_host() { local host="${NOWHERE_LISTEN_HOST_VALUE:-}"; [[ -z "$host" || "$host" == '*' || "$host" == 0.0.0.0 || "$host" == :: ]] && printf 127.0.0.1 || strip_brackets "$host"; }
+print_tls_fingerprint_from_logs() {
+  command -v journalctl >/dev/null 2>&1 || return 1
+  journalctl -u "$SERVICE_NAME" -n 300 --no-pager 2>/dev/null |
+    sed -nE 's/.*CERT_SHA256\|([A-Fa-f0-9]{64}).*/\1/p' |
+    tail -n 1
+}
 print_tls_fingerprint() {
   require_root; load_config
   [[ "${NOWHERE_TLS_VALUE:-1}" == 1 ]] || { echo "tls=2 uses the supplied certificate; no self-signed fingerprint is needed."; return; }
+  local fingerprint output host
+  fingerprint="$(print_tls_fingerprint_from_logs || true)"
+  [[ -n "$fingerprint" ]] && { echo "Self-signed certificate SHA-256:"; echo "  ${fingerprint}"; return; }
   [[ "${NOWHERE_TCP_CARRIER_VALUE:-none}" != none ]] || { warn "Fingerprint probing needs a TCP carrier."; return 1; }
   command -v openssl >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 || { warn "openssl and timeout are required."; return 1; }
-  local fingerprint output host; host="$(local_tls_probe_host)"
-  for _ in 1 2 3 4 5; do output="$(timeout 8 openssl s_client -connect "${host}:${NOWHERE_TCP_PORT_VALUE}" -servername "${NOWHERE_PUBLIC_HOST_VALUE:-localhost}" -showcerts </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null || true)"; fingerprint="${output#*=}"; [[ -n "$fingerprint" && "$fingerprint" != "$output" ]] && { echo "Self-signed certificate SHA-256:"; echo "  ${fingerprint}"; return; }; sleep 1; done
+  host="$(local_tls_probe_host)"
+  for _ in 1 2 3 4 5; do output="$(timeout 8 openssl s_client -connect "${host}:${NOWHERE_TCP_PORT_VALUE}" -servername "${NOWHERE_PUBLIC_HOST_VALUE:-localhost}" -alpn nw2 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null || true)"; fingerprint="${output#*=}"; [[ -n "$fingerprint" && "$fingerprint" != "$output" ]] && { echo "Self-signed certificate SHA-256:"; echo "  ${fingerprint}"; return; }; sleep 1; done
   warn "Fingerprint unavailable. Check: journalctl -u ${SERVICE_NAME} -n 100 --no-pager"
 }
 
@@ -497,7 +548,7 @@ install_vector() { NOWHERE_CLIENT=vector; [[ "$VERSION_EXPLICIT" -eq 1 ]] || NOW
 quick_install() { ASSUME_YES=1 install_default; }
 configure_all() { require_root; require_systemd; load_config; NOWHERE_VERSION="${NOWHERE_VERSION_VALUE:-$DEFAULT_VERSION}"; configure_values; save_config; write_service; systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; print_links; print_tls_fingerprint || true; }
 update_saved_version() { sed -i.bak "s/^NOWHERE_VERSION_VALUE=.*/NOWHERE_VERSION_VALUE=$(env_quote "$1")/" "$CONFIG_FILE"; rm -f "${CONFIG_FILE}.bak"; }
-update_all() { require_root; require_systemd; load_config; [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No installation config found."; local selected; if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then selected="$NOWHERE_VERSION"; else choose_release_version || return; selected="$SELECTED_VERSION"; fi; require_supported_version "$selected"; install_binary "$selected"; update_saved_version "$selected"; systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; info "Nowhere updated to ${selected}."; print_links; print_tls_fingerprint || true; }
+update_all() { require_root; require_systemd; load_config; [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No installation config found."; local selected; if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then selected="$NOWHERE_VERSION"; else choose_release_version || return; selected="$SELECTED_VERSION"; fi; require_supported_version "$selected"; confirm_morph_upgrade "$NOWHERE_VERSION_VALUE" "$selected" || return; install_binary "$selected"; update_saved_version "$selected"; systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; info "Nowhere updated to ${selected}."; print_links; print_tls_fingerprint || true; }
 open_tui() { require_root; [[ -x "$BIN_PATH" ]] || die "Nowhere is not installed."; [[ -t 0 && -t 1 ]] || die "The TUI requires an interactive terminal."; "$BIN_PATH" tui; }
 uninstall_all() { require_root; require_systemd; systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true; rm -f "$SERVICE_FILE" "$BIN_PATH"; systemctl daemon-reload; warn "Kept ${CONFIG_DIR} to preserve configuration and keys."; }
 

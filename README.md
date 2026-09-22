@@ -7,7 +7,7 @@ An interactive deployment and management script for a Linux VPS running
 
 ## Scope
 
-This script installs `v2.0.0` by default and supports current releases from
+This script installs `v2.1.0` by default and supports current releases from
 `v2.0.0` onward. Release selection excludes V1 automatically. It generates
 `nowhere://` links for Anywhere plus `vector://` URLs for the native Vector client.
 
@@ -18,8 +18,8 @@ This script installs `v2.0.0` by default and supports current releases from
 - Endpoint forms: shared TCP/UDP port, independent ports, TCP-only,
   UDP-only, and `tcp4`/`tcp6`/`udp4`/`udp6` address-family restrictions.
 - Portal TLS modes, `morph`, rate limits, outbound SOCKS5, native `next` Portal
-  chaining, Mux, SNI, certificate pinning, logs, and transport environment
-  settings.
+  chaining, Mux, SNI, certificate pinning, logs, TCP Morph prelude mode, and
+  transport environment settings.
 - Native Vector URL generation with fixed or `mix` routes, Mux, SNI, pin,
   rate limits, logs, and local SOCKS5 listener.
 - Anywhere TCP and UDP import links, plus a terminal QR code for the preferred
@@ -98,6 +98,23 @@ SOCKS and `next` are mutually exclusive.
 Use `--next key@host:port` or an explicit carrier endpoint to configure a
 next-hop Portal. Its route policy and TLS settings are available through
 `--next-up`, `--next-down`, `--next-mux`, `--next-sni`, and `--next-pin`.
+
+## Morph and Upgrades
+
+`morph=0` is the default. With `morph=1`, Nowhere `v2.1.0` changes the Morph
+wire format and cannot communicate with a `v2.0.x` Morph peer. Before upgrading
+a Morph-enabled Portal from `v2.0.x` to `v2.1.0` or later, upgrade every
+affected Anywhere client, native Vector node, and native `next` hop together.
+
+The interactive update flow requires typing `UPGRADE` at this compatibility
+boundary. Non-interactive automation is refused unless the coordinated rollout
+has been completed and `--allow-morph-breaking-upgrade` is supplied.
+
+For TCP Morph connections initiated by the local Nowhere process, choose the
+client-side prelude mode with `--morph-tcp-prelude low7|full8`. `low7` is the
+default and is appropriate for most deployments. This setting affects native
+outbound connections such as `next`; it is not included in Anywhere import
+links.
 
 ## Client Output
 
