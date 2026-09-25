@@ -7,7 +7,7 @@
 
 ## 支持范围
 
-脚本默认安装 `v2.1.0`，支持 `v2.0.0` 及之后的当前 Release；指定版本列表会自动
+脚本默认安装 `v2.1.1`，支持 `v2.0.0` 及之后的当前 Release；指定版本列表会自动
 排除 V1。脚本输出 Anywhere 的 `nowhere://` 链接和 Native Vector 的 `vector://` URL。
 
 ## 功能
@@ -21,7 +21,7 @@
 - 支持 Native Vector 固定路由或 `mix`、Mux、SNI、Pin、限速、日志和本地
   SOCKS5 监听。
 - 输出 Anywhere 的 TCP、UDP 导入链接，并为优先可用链路生成终端二维码。
-- 提供 Terminal UI、日志、服务启停与 `tls=1` 自签证书 SHA-256 查询。
+- 提供 Terminal UI、日志、服务启停与 TLS 证书 SHA-256 查询。
 
 ## 快速开始
 
@@ -53,7 +53,7 @@ sudo bash nowhere-vps.sh
 11) 打开 Terminal UI
 12) 查看日志
 13) 打印客户端链接 / 二维码
-14) 查看 tls=1 证书 SHA-256
+14) 查看证书 SHA-256
 15) 卸载服务
 16) 切换语言
 17) 更新部署脚本
@@ -105,6 +105,9 @@ Vector 节点和原生 `next` 跳板。
 拒绝；只有已完成协同升级时，才应额外传入
 `--allow-morph-breaking-upgrade`。
 
+Nowhere `v2.1.1` 移除了 `event` 日志级别。更新或重配到 `v2.1.1` 及之后版本时，
+脚本会自动将已保存的 `event` 改为 `info`；选择较早版本时仍允许使用 `event`。
+
 本机 Nowhere 进程主动发起的 TCP Morph 连接可用
 `--morph-tcp-prelude low7|full8` 选择前导模式，默认 `low7`，大多数场景无需
 调整。它影响原生 `next` 等出站连接，不会写入 Anywhere 导入链接。
@@ -125,7 +128,10 @@ Vector 相关参数是 `--vector-up`、`--vector-down`、`--mux`、`--vector-soc
 
 ## TLS
 
-默认 `tls=1` 使用内存自签证书；每次服务重启后 fingerprint 都会变化：
+指纹命令会输出 Portal 实际加载证书的 SHA-256，适用于自签证书（`tls=1`）和
+PEM 证书（`tls=2`）。脚本优先探测本机 TCP 当前呈现的证书；探测不可用时再从
+Nowhere 日志读取，因此 PEM 证书热重载后也能显示当前指纹。自签证书指纹每次重启
+都会变化；PEM 证书指纹会在证书续期后变化：
 
 ```bash
 sudo bash nowhere-vps.sh fingerprint

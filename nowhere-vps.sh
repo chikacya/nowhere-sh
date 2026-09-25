@@ -11,7 +11,7 @@ CONFIG_DIR="/etc/nowhere"
 CONFIG_FILE="${CONFIG_DIR}/nowhere.env"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-DEFAULT_VERSION="v2.1.0"
+DEFAULT_VERSION="v2.1.1"
 DEFAULT_PORT="2077"
 DEFAULT_TCP_CARRIER="tcp"
 DEFAULT_UDP_CARRIER="udp"
@@ -95,7 +95,7 @@ Usage:
   sudo bash nowhere-vps.sh install [--yes] [options]
   sudo bash nowhere-vps.sh install-vector [--yes] [options]
   sudo bash nowhere-vps.sh configure [options]
-  sudo bash nowhere-vps.sh update [--version v2.1.0]
+  sudo bash nowhere-vps.sh update [--version v2.1.1]
   sudo bash nowhere-vps.sh update-script
   sudo bash nowhere-vps.sh versions
   sudo bash nowhere-vps.sh start|stop|restart|status|tui|logs|link|fingerprint|uninstall
@@ -105,7 +105,7 @@ This script supports Nowhere releases v2.0.0 and later. Press Enter in the wizar
 Options:
   --client anywhere|vector|both
   --lang zh|en                    Wizard and menu language
-  --version v2.1.0
+  --version v2.1.1
   --key secret
   --public-host host              Client-facing domain or IP
   --listen-host host              Portal bind host; empty binds wildcard addresses
@@ -142,7 +142,7 @@ validate_language() { [[ "$1" == zh || "$1" == en ]]; }
 default_language() {
   case "${LC_ALL:-${LANG:-}}" in zh_*|zh.*) printf zh ;; *) printf en ;; esac
 }
-is_chinese() { [[ "$NOWHERE_LANG" == zh ]]; }
+is_chinese() { [[ "${NOWHERE_LANG:-${NOWHERE_LANG_VALUE:-en}}" == zh ]]; }
 resolve_language() {
   if [[ -n "${NOWHERE_LANG:-}" ]]; then validate_language "$NOWHERE_LANG" || die "NOWHERE_LANG must be zh or en."; return; fi
   if [[ -n "${NOWHERE_LANG_VALUE:-}" ]]; then NOWHERE_LANG="$NOWHERE_LANG_VALUE"; validate_language "$NOWHERE_LANG" || die "Saved language must be zh or en."; return; fi
@@ -261,6 +261,13 @@ version_at_least() {
   done
   return 0
 }
+validate_log_level() {
+  if version_at_least "$NOWHERE_VERSION" v2.1.1; then
+    [[ "$1" =~ ^(none|debug|info|warn|error)$ ]]
+  else
+    [[ "$1" =~ ^(none|debug|info|warn|error|event)$ ]]
+  fi
+}
 is_morph_upgrade_boundary() {
   [[ "${NOWHERE_MORPH_VALUE:-$DEFAULT_MORPH}" == 1 ]] || return 1
   version_at_least "$2" v2.1.0 && ! version_at_least "$1" v2.1.0
@@ -278,6 +285,48 @@ confirm_morph_upgrade() {
   read -r -p "Type UPGRADE to continue: " answer
   [[ "$answer" == UPGRADE ]] || { warn "Update cancelled."; return 1; }
 }
+REMOVED_EVENT_LOG_MIGRATED=0
+normalize_removed_event_logs() {
+  REMOVED_EVENT_LOG_MIGRATED=0
+  version_at_least "$NOWHERE_VERSION" v2.1.1 || return 0
+  if [[ "${NOWHERE_LOG_VALUE:-${NOWHERE_LOG:-}}" == event || "${NOWHERE_LOG:-}" == event ]]; then
+    NOWHERE_LOG_VALUE=info; NOWHERE_LOG=info; REMOVED_EVENT_LOG_MIGRATED=1
+  fi
+  if [[ "${NOWHERE_VECTOR_LOG_VALUE:-${NOWHERE_VECTOR_LOG:-}}" == event || "${NOWHERE_VECTOR_LOG:-}" == event ]]; then
+    NOWHERE_VECTOR_LOG_VALUE=info; NOWHERE_VECTOR_LOG=info; REMOVED_EVENT_LOG_MIGRATED=1
+  fi
+  if [[ "${NOWHERE_PORTAL:-}" == *log=event* ]]; then
+    NOWHERE_PORTAL="${NOWHERE_PORTAL//log=event/log=info}"
+    REMOVED_EVENT_LOG_MIGRATED=1
+  fi
+  if [[ "$REMOVED_EVENT_LOG_MIGRATED" -eq 1 ]]; then
+    if is_chinese; then warn "Nowhere v2.1.1 已移除 event 日志级别，旧设置已自动改为 info。"; else warn "Nowhere v2.1.1 removed the event log level; legacy settings were changed to info."; fi
+  fi
+}
+escape_sed_replacement() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//&/\\&}"
+  value="${value//|/\\|}"
+  printf '%s' "$value"
+}
+write_config_assignment() {
+  local name="$1" value="$2" quoted replacement
+  quoted="$(env_quote "$value")"
+  replacement="$(escape_sed_replacement "$quoted")"
+  if grep -q "^${name}=" "$CONFIG_FILE"; then
+    sed -i.bak "s|^${name}=.*|${name}=${replacement}|" "$CONFIG_FILE"
+    rm -f "${CONFIG_FILE}.bak"
+  else
+    printf '\n%s=%s\n' "$name" "$quoted" >>"$CONFIG_FILE"
+  fi
+}
+persist_removed_event_log_migration() {
+  [[ "$REMOVED_EVENT_LOG_MIGRATED" -eq 1 ]] || return 0
+  write_config_assignment NOWHERE_PORTAL "${NOWHERE_PORTAL:-}"
+  write_config_assignment NOWHERE_LOG_VALUE "$NOWHERE_LOG_VALUE"
+  write_config_assignment NOWHERE_VECTOR_LOG_VALUE "$NOWHERE_VECTOR_LOG_VALUE"
+}
 validate_config() {
   require_supported_version "$NOWHERE_VERSION"
   NOWHERE_CLIENT="$(normalize_client "$NOWHERE_CLIENT")" || die "NOWHERE_CLIENT must be anywhere, vector, or both."
@@ -293,7 +342,7 @@ validate_config() {
   validate_morph_tcp_prelude "$NOWHERE_MORPH_TCP_PRELUDE" || die "NOWHERE_MORPH_TCP_PRELUDE must be low7 or full8."
   validate_nonnegative_int "$NOWHERE_RATE" && validate_nonnegative_int "$NOWHERE_ETAR" || die "Rate limits must be non-negative integers."
   validate_socks "$NOWHERE_SOCKS" || die "Invalid NOWHERE_SOCKS value."
-  [[ "$NOWHERE_LOG" =~ ^(none|debug|info|warn|error|event)$ ]] || die "Invalid log level."
+  validate_log_level "$NOWHERE_LOG" || die "Invalid log level for Nowhere ${NOWHERE_VERSION}."
   validate_profile "$NOWHERE_TRANSPORT_MEMORY_PROFILE" || die "Invalid transport memory profile."
   validate_duration "$NOWHERE_MIX_FALLBACK_TIMEOUT" || die "Invalid mix fallback timeout."
   validate_duration "$NOWHERE_TELEMETRY_INTERVAL" || die "Invalid telemetry interval."
@@ -312,7 +361,7 @@ validate_config() {
     validate_bool "$NOWHERE_VECTOR_MUX" && validate_sni "$NOWHERE_VECTOR_SNI" && validate_pin "$NOWHERE_VECTOR_PIN" || die "Invalid Vector Mux, SNI, or pin."
     validate_vector_socks "$NOWHERE_VECTOR_SOCKS" || die "Invalid Vector SOCKS listener."
     validate_nonnegative_int "$NOWHERE_VECTOR_RATE" && validate_nonnegative_int "$NOWHERE_VECTOR_ETAR" || die "Vector rate limits must be non-negative integers."
-    [[ "$NOWHERE_VECTOR_LOG" =~ ^(none|debug|info|warn|error|event)$ ]] || die "Invalid Vector log level."
+    validate_log_level "$NOWHERE_VECTOR_LOG" || die "Invalid Vector log level for Nowhere ${NOWHERE_VERSION}."
   fi
 }
 
@@ -398,6 +447,7 @@ configure_values() {
   NOWHERE_LOG="${NOWHERE_LOG:-${NOWHERE_LOG_VALUE:-$DEFAULT_LOG}}"; NOWHERE_TRANSPORT_MEMORY_PROFILE="${NOWHERE_TRANSPORT_MEMORY_PROFILE:-${NOWHERE_TRANSPORT_MEMORY_PROFILE_VALUE:-${NOW_TRANSPORT_MEMORY_PROFILE:-$DEFAULT_TRANSPORT_MEMORY_PROFILE}}}"
   NOWHERE_MIX_FALLBACK_TIMEOUT="${NOWHERE_MIX_FALLBACK_TIMEOUT:-${NOWHERE_MIX_FALLBACK_TIMEOUT_VALUE:-${NOW_MIX_FALLBACK_TIMEOUT:-$DEFAULT_MIX_FALLBACK_TIMEOUT}}}"
   NOWHERE_TELEMETRY_INTERVAL="${NOWHERE_TELEMETRY_INTERVAL:-${NOWHERE_TELEMETRY_INTERVAL_VALUE:-${NOW_TELEMETRY_INTERVAL:-$DEFAULT_TELEMETRY_INTERVAL}}}"
+  normalize_removed_event_logs
 
   if [[ "$ASSUME_YES" -eq 0 ]]; then
     is_chinese && info "Nowhere 配置向导。直接回车保留默认值。" || info "Nowhere configuration wizard. Press Enter to keep defaults."
@@ -545,23 +595,31 @@ print_links() {
   echo; echo "Firewall reminder:"; [[ "$NOWHERE_TCP_CARRIER_VALUE" == none ]] || echo "  Open TCP ${NOWHERE_TCP_PORT_VALUE}"; [[ "$NOWHERE_UDP_CARRIER_VALUE" == none ]] || echo "  Open UDP ${NOWHERE_UDP_PORT_VALUE}"
 }
 
-local_tls_probe_host() { local host="${NOWHERE_LISTEN_HOST_VALUE:-}"; [[ -z "$host" || "$host" == '*' || "$host" == 0.0.0.0 || "$host" == :: ]] && printf 127.0.0.1 || strip_brackets "$host"; }
+local_tls_probe_host() {
+  local host="$(strip_brackets "${NOWHERE_LISTEN_HOST_VALUE:-}")" carrier="${NOWHERE_TCP_CARRIER_VALUE:-tcp}"
+  if [[ -z "$host" || "$host" == '*' || "$host" == 0.0.0.0 || "$host" == :: ]]; then
+    [[ "$carrier" == tcp6 ]] && printf '[::1]' || printf '127.0.0.1'
+  elif [[ "$host" == *:* ]]; then
+    printf '[%s]' "$host"
+  else
+    printf '%s' "$host"
+  fi
+}
 print_tls_fingerprint_from_logs() {
   command -v journalctl >/dev/null 2>&1 || return 1
   journalctl -u "$SERVICE_NAME" -n 300 --no-pager 2>/dev/null |
-    sed -nE 's/.*CERT_SHA256\|([A-Fa-f0-9]{64}).*/\1/p' |
+    sed -nE 's/.*CERT_SHA256\|([A-Fa-f0-9]{64}).*/\1/p; s/.*TLS certificate SHA-256 fingerprint:[[:space:]]*([A-Fa-f0-9]{64}).*/\1/p' |
     tail -n 1
 }
 print_tls_fingerprint() {
   require_root; load_config
-  [[ "${NOWHERE_TLS_VALUE:-1}" == 1 ]] || { echo "tls=2 uses the supplied certificate; no self-signed fingerprint is needed."; return; }
   local fingerprint output host
   fingerprint="$(print_tls_fingerprint_from_logs || true)"
-  [[ -n "$fingerprint" ]] && { echo "Self-signed certificate SHA-256:"; echo "  ${fingerprint}"; return; }
-  [[ "${NOWHERE_TCP_CARRIER_VALUE:-none}" != none ]] || { warn "Fingerprint probing needs a TCP carrier."; return 1; }
-  command -v openssl >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 || { warn "openssl and timeout are required."; return 1; }
-  host="$(local_tls_probe_host)"
-  for _ in 1 2 3 4 5; do output="$(timeout 8 openssl s_client -connect "${host}:${NOWHERE_TCP_PORT_VALUE}" -servername "${NOWHERE_PUBLIC_HOST_VALUE:-localhost}" -alpn nw2 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null || true)"; fingerprint="${output#*=}"; [[ -n "$fingerprint" && "$fingerprint" != "$output" ]] && { echo "Self-signed certificate SHA-256:"; echo "  ${fingerprint}"; return; }; sleep 1; done
+  if [[ "${NOWHERE_TCP_CARRIER_VALUE:-none}" != none ]] && command -v openssl >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
+    host="$(local_tls_probe_host)"
+    for _ in 1 2 3 4 5; do output="$(timeout 8 openssl s_client -connect "${host}:${NOWHERE_TCP_PORT_VALUE}" -servername "${NOWHERE_PUBLIC_HOST_VALUE:-localhost}" -alpn nw2 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 2>/dev/null || true)"; fingerprint="${output#*=}"; [[ -n "$fingerprint" && "$fingerprint" != "$output" ]] && { echo "Certificate SHA-256:"; echo "  ${fingerprint}"; return; }; sleep 1; done
+  fi
+  [[ -n "$fingerprint" ]] && { echo "Certificate SHA-256 (from logs):"; echo "  ${fingerprint}"; return; }
   warn "Fingerprint unavailable. Check: journalctl -u ${SERVICE_NAME} -n 100 --no-pager"
 }
 
@@ -598,7 +656,25 @@ update_saved_language() {
   fi
 }
 change_language() { NOWHERE_LANG=""; NOWHERE_LANG_VALUE=""; resolve_language; update_saved_language; }
-update_all() { require_root; require_systemd; load_config; [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No installation config found."; local selected; if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then selected="$NOWHERE_VERSION"; else choose_release_version || return; selected="$SELECTED_VERSION"; fi; require_supported_version "$selected"; confirm_morph_upgrade "$NOWHERE_VERSION_VALUE" "$selected" || return; install_binary "$selected"; update_saved_version "$selected"; systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"; info "Nowhere updated to ${selected}."; print_links; print_tls_fingerprint || true; }
+update_all() {
+  require_root; require_systemd; load_config
+  [[ -n "${NOWHERE_VERSION_VALUE:-}" ]] || die "No installation config found."
+  local selected
+  if [[ "$VERSION_EXPLICIT" -eq 1 ]]; then selected="$NOWHERE_VERSION"; else choose_release_version || return; selected="$SELECTED_VERSION"; fi
+  require_supported_version "$selected"
+  confirm_morph_upgrade "$NOWHERE_VERSION_VALUE" "$selected" || return
+  NOWHERE_VERSION="$selected"
+  NOWHERE_LOG_VALUE="${NOWHERE_LOG_VALUE:-${NOWHERE_LOG:-$DEFAULT_LOG}}"
+  NOWHERE_VECTOR_LOG_VALUE="${NOWHERE_VECTOR_LOG_VALUE:-${NOWHERE_VECTOR_LOG:-$DEFAULT_LOG}}"
+  normalize_removed_event_logs
+  persist_removed_event_log_migration
+  install_binary "$selected"
+  update_saved_version "$selected"
+  systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1 && systemctl restart "$SERVICE_NAME"
+  info "Nowhere updated to ${selected}."
+  print_links
+  print_tls_fingerprint || true
+}
 update_script() {
   local tmp backup mode
   [[ -f "$SCRIPT_PATH" ]] || die "Cannot update a script run from a pipe. Download it to a file first."
@@ -640,7 +716,7 @@ menu() {
  11) 打开终端界面
  12) 查看实时日志
  13) 打印客户端链接 / 二维码
- 14) 查看 tls=1 证书 SHA-256
+ 14) 查看证书 SHA-256
  15) 卸载服务
  16) 切换语言
  17) 更新部署脚本
@@ -664,7 +740,7 @@ EOF
  11) Open Terminal UI
  12) Follow logs
  13) Print client links / QR code
-14) Show tls=1 certificate SHA-256
+14) Show certificate SHA-256
 15) Uninstall
  16) Switch language
  17) Update deployment script

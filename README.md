@@ -7,7 +7,7 @@ An interactive deployment and management script for a Linux VPS running
 
 ## Scope
 
-This script installs `v2.1.0` by default and supports current releases from
+This script installs `v2.1.1` by default and supports current releases from
 `v2.0.0` onward. Release selection excludes V1 automatically. It generates
 `nowhere://` links for Anywhere plus `vector://` URLs for the native Vector client.
 
@@ -24,8 +24,8 @@ This script installs `v2.1.0` by default and supports current releases from
   rate limits, logs, and local SOCKS5 listener.
 - Anywhere TCP and UDP import links, plus a terminal QR code for the preferred
   available carrier.
-- Terminal UI, logs, service lifecycle commands, and self-signed certificate
-  SHA-256 fingerprint output.
+- Terminal UI, logs, service lifecycle commands, and TLS certificate SHA-256
+  fingerprint output.
 
 ## Quick Start
 
@@ -60,7 +60,7 @@ group.
 11) Open Terminal UI
 12) Follow logs
 13) Print client links / QR code
-14) Show tls=1 certificate SHA-256
+14) Show certificate SHA-256
 15) Uninstall
 16) Switch language
 17) Update deployment script
@@ -116,6 +116,10 @@ The interactive update flow requires typing `UPGRADE` at this compatibility
 boundary. Non-interactive automation is refused unless the coordinated rollout
 has been completed and `--allow-morph-breaking-upgrade` is supplied.
 
+Nowhere `v2.1.1` removes the `event` log level. When updating or reconfiguring
+to `v2.1.1` or later, this script automatically changes a saved `event` level
+to `info`; older selected releases continue to accept `event`.
+
 For TCP Morph connections initiated by the local Nowhere process, choose the
 client-side prelude mode with `--morph-tcp-prelude low7|full8`. `low7` is the
 default and is appropriate for most deployments. This setting affects native
@@ -138,8 +142,12 @@ The Vector options are `--vector-up`, `--vector-down`, `--mux`,
 
 ## TLS
 
-`tls=1` is the default and creates an in-memory self-signed certificate. Its
-fingerprint changes after every service restart:
+The fingerprint command prints the SHA-256 fingerprint for the certificate
+loaded by Portal, whether it is self-signed (`tls=1`) or supplied as PEM
+(`tls=2`). It probes the live local TCP endpoint first and falls back to the
+Nowhere log when probing is unavailable, so hot-reloaded PEM certificates are
+reported correctly. A self-signed fingerprint changes after every service
+restart; a PEM fingerprint changes when that certificate is renewed.
 
 ```bash
 sudo bash nowhere-vps.sh fingerprint
