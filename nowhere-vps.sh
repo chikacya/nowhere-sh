@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="NodePassProject/Nowhere"
-SCRIPT_RAW_URL="https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh"
+SCRIPT_RAW_URL="https://raw.githubusercontent.com/NodePassProject/nowhere-sh/main/nowhere-vps.sh"
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 if command -v readlink >/dev/null 2>&1; then SCRIPT_PATH="$(readlink -f "$SCRIPT_PATH" 2>/dev/null || printf '%s' "$SCRIPT_PATH")"; fi
 SERVICE_NAME="nowhere"

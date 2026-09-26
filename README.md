@@ -32,7 +32,7 @@ This script installs `v2.1.1` by default and supports current releases from
 Requirements: Linux, systemd, `curl`, `tar`, and an `x86_64` or `aarch64` VPS.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh -o nowhere-vps.sh
+curl -fsSL https://raw.githubusercontent.com/NodePassProject/nowhere-sh/main/nowhere-vps.sh -o nowhere-vps.sh
 chmod +x nowhere-vps.sh
 sudo bash nowhere-vps.sh
 ```
@@ -69,7 +69,7 @@ group.
 For non-interactive defaults:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh | sudo bash -s -- install --yes
+curl -fsSL https://raw.githubusercontent.com/NodePassProject/nowhere-sh/main/nowhere-vps.sh | sudo bash -s -- install --yes
 ```
 
 ## Endpoints

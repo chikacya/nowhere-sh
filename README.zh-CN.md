@@ -28,7 +28,7 @@
 系统需要 Linux、systemd、`curl`、`tar`，支持 `x86_64` 与 `aarch64` VPS。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh -o nowhere-vps.sh
+curl -fsSL https://raw.githubusercontent.com/NodePassProject/nowhere-sh/main/nowhere-vps.sh -o nowhere-vps.sh
 chmod +x nowhere-vps.sh
 sudo bash nowhere-vps.sh
 ```
@@ -62,7 +62,7 @@ sudo bash nowhere-vps.sh
 非交互默认安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/chikacya/nowhere-sh/main/nowhere-vps.sh | sudo bash -s -- install --yes
+curl -fsSL https://raw.githubusercontent.com/NodePassProject/nowhere-sh/main/nowhere-vps.sh | sudo bash -s -- install --yes
 ```
 
 ## Carrier
